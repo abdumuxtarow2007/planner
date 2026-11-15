@@ -4,22 +4,25 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Мой день — планировщик</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Onest:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root{
-  --lapis:#1c2b5e;--lapis-2:#2a3d80;
-  --turq:#0e8c8c;--turq-soft:#dff3f1;
-  --saffron:#e9a23b;--saffron-soft:#fdf1da;
-  --pome:#c7384f;--pome-soft:#fbe6ea;
-  --ground:#f3f5f9;--surface:#fff;--ink:#1a1f36;--muted:#667085;--line:#e4e8f0;
-  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
-  --sans:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
-  --shadow:0 1px 2px rgba(28,43,94,.06),0 6px 20px -8px rgba(28,43,94,.12);
+  --lapis:#0a6ee0;--lapis-2:#0a5fd0;--sky:#3baffc;--deep:#0a3ec2;--tint:#eaf3fe;
+  --turq:#0e9f5b;--turq-soft:#e3f6ec;
+  --saffron:#f0a020;--saffron-soft:#fef4dd;
+  --pome:#d6364b;--pome-soft:#fdeaed;
+  --ground:#f5f8fc;--surface:#fff;--ink:#0a1020;--muted:#66738a;--line:#e3e9f2;
+  --sans:"Onest",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --serif:var(--sans);
+  --shadow:0 1px 2px rgba(10,16,32,.04),0 10px 28px -14px rgba(10,16,32,.14);
 }
 *{box-sizing:border-box}
 html{color-scheme:light}
 body{margin:0;background:var(--ground);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
 button{font:inherit;color:inherit;cursor:pointer}
-:focus-visible{outline:2px solid var(--turq);outline-offset:2px;border-radius:6px}
+:focus-visible{outline:2px solid var(--lapis);outline-offset:2px;border-radius:6px}
 svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
 
 .app{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
@@ -59,9 +62,11 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 
 /* ---------- герой ---------- */
 .hero{position:relative;overflow:hidden;border-radius:22px;padding:28px 30px;color:#fff;margin-bottom:14px;
-  background-color:var(--lapis);
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.08' stroke-width='1.2'%3E%3Crect x='12' y='12' width='32' height='32'/%3E%3Crect x='12' y='12' width='32' height='32' transform='rotate(45 28 28)'/%3E%3C/g%3E%3C/svg%3E"),
-    linear-gradient(120deg,var(--lapis) 40%,#243a86);
+  background-color:var(--deep);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 900 300' preserveAspectRatio='none'%3E%3Cg fill='none' stroke='%23fff' stroke-width='60' stroke-linecap='round'%3E%3Cpath stroke-opacity='.07' d='M-60 250C160 120 300 330 520 190S820 40 980 120'/%3E%3Cpath stroke-opacity='.05' d='M-60 120C140 10 330 200 540 70S800-40 980-10'/%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(90% 130% at 92% 0%,rgba(59,175,252,.6),transparent 60%),
+    linear-gradient(135deg,var(--deep) 0%,#0a55c9 55%,var(--lapis) 100%);
+  background-size:100% 100%,auto,auto;background-repeat:no-repeat;
   display:flex;justify-content:space-between;align-items:center;gap:22px}
 .hero .rel{font-size:14px;opacity:.78}
 .hero h2{margin:2px 0 4px;font:600 clamp(32px,5vw,46px)/1.05 var(--serif);color:#fff}
@@ -144,7 +149,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .plan h3{margin:0;font:600 19px/1.25 var(--serif);overflow-wrap:anywhere}
 .plan .ph{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
 .chip{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:20px;background:var(--ground);color:var(--muted)}
-.chip.ok{background:var(--turq-soft);color:#0a6a6a}
+.chip.ok{background:var(--turq-soft);color:#065f3b}
 .step{display:flex;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line)}
 .step .chk{width:20px;height:20px;border-width:2px;margin:0}
 .step .chk svg{width:12px;height:12px}
@@ -154,7 +159,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 
 /* ---------- поля ---------- */
 input[type=text],input[type=date],input[type=time],textarea,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid #d3d9e6;border-radius:10px;padding:9px 11px;width:100%;min-width:0}
-input:focus,textarea:focus,select:focus{outline:2px solid var(--turq);outline-offset:-1px;border-color:var(--turq)}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--lapis);outline-offset:-1px;border-color:var(--lapis)}
 label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
 .fg{display:grid;gap:14px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
@@ -163,7 +168,7 @@ label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:60
 .seg input{position:absolute;opacity:0;inset:0;cursor:pointer}
 .seg span{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border:1px solid #d3d9e6;border-radius:10px;font-weight:600;font-size:14px;color:var(--muted)}
 .seg input:checked + span{border-color:var(--lapis);background:var(--lapis);color:#fff}
-.seg input:focus-visible + span{outline:2px solid var(--turq);outline-offset:2px}
+.seg input:focus-visible + span{outline:2px solid var(--lapis);outline-offset:2px}
 
 dialog{border:0;border-radius:20px;padding:0;max-width:480px;width:calc(100% - 28px);box-shadow:0 30px 80px -20px rgba(20,28,70,.5);color:var(--ink)}
 dialog::backdrop{background:rgba(20,28,60,.45)}
@@ -192,7 +197,7 @@ dialog h2{margin:0 0 16px;font:600 22px var(--serif)}
 .nav .dot.ok{background:#2bb673}.nav .dot.bad{background:var(--pome)}
 .tgst{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;padding:5px 12px;border-radius:20px;background:var(--saffron-soft);color:#7a5410}
 .tgst i{width:8px;height:8px;border-radius:50%;background:currentColor}
-.tgst.ok{background:var(--turq-soft);color:#0a6a6a}.tgst.bad{background:var(--pome-soft);color:var(--pome)}
+.tgst.ok{background:var(--turq-soft);color:#065f3b}.tgst.bad{background:var(--pome-soft);color:var(--pome)}
 .steps{margin:0 0 16px;padding-left:22px;display:grid;gap:8px}
 .steps a,.small a{color:var(--turq);font-weight:600}
 a.btn{text-decoration:none;color:var(--ink)}a.btn.pri{color:#fff}
@@ -243,15 +248,71 @@ h2 + .ex{border-top:0}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 
+/* ---------- стиль One Flow: синий акцент, Onest, мягкие плитки ---------- */
+.top h1,.hero h2,.brand b,.plan h3,dialog h2,.stat b,.ring b,.card h2{font-family:var(--sans);letter-spacing:-.02em}
+.top h1{font-weight:700;font-size:30px}
+.hero h2{font-weight:700;letter-spacing:-.03em}
+.brand b{font-weight:700;font-size:20px}
+.plan h3,dialog h2{font-weight:700}
+.stat b{font-weight:700;color:var(--lapis)}
+.card h2{font-weight:600}
+.logo{border-radius:11px;background:linear-gradient(135deg,var(--sky) 0%,var(--lapis) 50%,var(--deep) 100%);box-shadow:inset 0 1px 0 rgba(255,255,255,.4),0 6px 14px -6px rgba(10,110,224,.6)}
+.side{border-right-color:var(--line)}
+.nav button{border-radius:12px;font-weight:500;color:#4b576c}
+.nav button svg.i{color:#8794a9}
+.nav button:hover{background:var(--ground)}
+.nav button.on{background:var(--tint);color:var(--ink);font-weight:600}
+.nav button.on svg.i{color:var(--lapis)}
+.nav .on .badge{background:#fff;color:var(--lapis)}
+.nav .badge.red,.nav .on .badge.red{background:var(--pome);color:#fff}
+.btn{border-radius:12px;border-color:var(--line)}
+.btn:hover{border-color:var(--lapis);color:var(--lapis)}
+.btn.pri,.btn.pri:hover{color:#fff}
+.btn.pri{background:var(--lapis);border-color:var(--lapis);box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 8px 18px -8px rgba(10,110,224,.7)}
+.btn.pri:hover{background:var(--lapis-2)}
+.btn.danger:hover{border-color:var(--pome);color:var(--pome)}
+.card{border-radius:18px;border-color:var(--line)}
+.hero{border-radius:24px;box-shadow:0 18px 40px -22px rgba(10,62,194,.65)}
+.hero .next{background:rgba(255,255,255,.12);border-color:rgba(255,255,255,.2);border-radius:14px;backdrop-filter:blur(4px)}
+.col{border-radius:14px}
+.col.sel{background:linear-gradient(160deg,var(--lapis),var(--deep));box-shadow:0 8px 18px -10px rgba(10,62,194,.8)}
+.col .bo{background:#dfe7f2}
+.col .bi{background:var(--lapis)}
+.col.sel .bi{background:#fff}
+.col.today b::after{background:var(--lapis)}
+.col.sel.today b::after{background:#fff}
+.chk{border-color:#c5d0e0}
+.chk:hover{border-color:var(--lapis)}
+.done .chk{background:var(--lapis);border-color:var(--lapis)}
+.pbar i{background:linear-gradient(90deg,var(--sky),var(--lapis))}
+.pr2{color:#b9770a}.pr3{color:var(--lapis)}
+.time{background:var(--tint);color:var(--deep)}
+.chip{background:var(--ground);color:#4b576c}
+.ag.now{border-left-color:var(--lapis);background:linear-gradient(90deg,var(--tint),transparent 75%)}
+.ag.now .chip.ok{background:var(--lapis);color:#fff}
+.dchips button{border-radius:14px}
+.dchips button.today{border-color:var(--lapis)}
+.dchips button.on,.seg input:checked + span{background:var(--lapis);border-color:var(--lapis)}
+.sideFoot i{background:var(--turq)}
+.steps a,.small a{color:var(--lapis)}
+input[type=text],input[type=date],input[type=time],textarea,select{border-radius:12px;border-color:#d5deea}
+dialog{border-radius:24px}
+dialog::backdrop{background:rgba(10,16,32,.5)}
+#toast{background:var(--ink);border-radius:14px}
+@media (max-width:760px){
+  .top h1{font-size:25px}
+  .nav button.on{background:var(--tint)}
+}
+
 /* ---------- PDF ---------- */
 #printRoot{display:none}
 @media print{
   html,body{background:#fff}
   .app,#toast,dialog{display:none!important}
   #printRoot{display:block;font:12.5px/1.45 var(--sans);color:#000}
-  #printRoot h1{font:600 22px var(--serif);margin:0 0 2px;color:#1c2b5e}
-  #printRoot .pm{color:#555;font-size:11px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1c2b5e}
-  #printRoot h2{font:600 15px var(--sans);margin:18px 0 6px;color:#1c2b5e}
+  #printRoot h1{font:600 22px var(--serif);margin:0 0 2px;color:#0a3ec2}
+  #printRoot .pm{color:#555;font-size:11px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #0a3ec2}
+  #printRoot h2{font:600 15px var(--sans);margin:18px 0 6px;color:#0a3ec2}
   #printRoot h4{font-size:12.5px;margin:12px 0 4px}
   #printRoot table{width:100%;border-collapse:collapse}
   #printRoot td{padding:4px 5px;border-bottom:1px solid #ddd;vertical-align:top}
@@ -269,7 +330,7 @@ h2 + .ex{border-top:0}
 <div class="app">
   <aside class="side">
     <div class="brand">
-      <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7"><rect x="5" y="5" width="14" height="14"/><rect x="5" y="5" width="14" height="14" transform="rotate(45 12 12)"/></svg></div>
+      <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17a7 7 0 0114 0"/><path d="M2.5 17h19M12 5V3.5M5.6 7.6L4.5 6.5M18.4 7.6l1.1-1.1"/></svg></div>
       <b>Мой день</b>
     </div>
     <nav class="nav" id="nav"></nav>
@@ -583,7 +644,7 @@ function heroHTML(){
     </div>
     <div class="ring" aria-label="Выполнено ${pct}%">
       <svg width="128" height="128" viewBox="0 0 128 128"><circle cx="64" cy="64" r="${R}" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="10"/>
-      <circle cx="64" cy="64" r="${R}" fill="none" stroke="#f2b84b" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct/100)}" style="transition:stroke-dashoffset .5s"/></svg>
+      <circle cx="64" cy="64" r="${R}" fill="none" stroke="#fff" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct/100)}" style="transition:stroke-dashoffset .5s"/></svg>
       <b>${pct}%</b>
     </div>
   </section>`;
@@ -613,7 +674,7 @@ function viewDay(){
   const t=today(),list=dayTasks(selDate).sort(sortT);
   const od=S.tasks.filter(x=>!x.done&&x.date<t);
   const open=S.tasks.filter(x=>!x.done),c={1:0,2:0,3:0};open.forEach(x=>c[x.prio]++);
-  const tot=open.length||1,col={1:'var(--pome)',2:'var(--saffron)',3:'var(--turq)'};
+  const tot=open.length||1,col={1:'var(--pome)',2:'var(--saffron)',3:'var(--lapis)'};
   const plans=S.plans.slice(0,3);
   return heroHTML()+weekHTML()+`<div class="split"><div>
     ${od.length?`<div class="alert"><div><b>Просрочено: ${od.length}</b><small>${esc(od.slice(0,2).map(x=>x.title).join('; '))}${od.length>2?'…':''}</small></div>
