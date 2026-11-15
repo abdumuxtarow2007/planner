@@ -158,7 +158,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .addStep{display:flex;gap:8px;margin-top:10px}
 
 /* ---------- поля ---------- */
-input[type=text],input[type=date],input[type=time],textarea,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid #d3d9e6;border-radius:10px;padding:9px 11px;width:100%;min-width:0}
+input[type=text],input[type=email],input[type=password],input[type=date],input[type=time],textarea,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid #d3d9e6;border-radius:10px;padding:9px 11px;width:100%;min-width:0}
 input:focus,textarea:focus,select:focus{outline:2px solid var(--lapis);outline-offset:-1px;border-color:var(--lapis)}
 label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
 .fg{display:grid;gap:14px}
@@ -295,7 +295,7 @@ h2 + .ex{border-top:0}
 .dchips button.on,.seg input:checked + span{background:var(--lapis);border-color:var(--lapis)}
 .sideFoot i{background:var(--turq)}
 .steps a,.small a{color:var(--lapis)}
-input[type=text],input[type=date],input[type=time],textarea,select{border-radius:12px;border-color:#d5deea}
+input[type=text],input[type=email],input[type=password],input[type=date],input[type=time],textarea,select{border-radius:12px;border-color:#d5deea}
 dialog{border-radius:24px}
 dialog::backdrop{background:rgba(10,16,32,.5)}
 #toast{background:var(--ink);border-radius:14px}
@@ -303,6 +303,23 @@ dialog::backdrop{background:rgba(10,16,32,.5)}
   .top h1{font-size:25px}
   .nav button.on{background:var(--tint)}
 }
+
+/* ---------- экран входа ---------- */
+.authWrap{position:fixed;inset:0;z-index:100;display:none;place-items:center;padding:20px;overflow:auto;
+  background:radial-gradient(90% 90% at 85% 0%,rgba(59,175,252,.55),transparent 60%),linear-gradient(135deg,var(--deep) 0%,#0a55c9 55%,var(--lapis) 100%)}
+body.locked .authWrap{display:grid}
+body.locked .app{display:none}
+.authCard{background:#fff;border-radius:24px;padding:28px;width:100%;max-width:400px;display:grid;gap:14px;box-shadow:0 30px 80px -20px rgba(10,16,32,.5)}
+.aBrand{display:flex;align-items:center;gap:11px}
+.aBrand b{font:700 22px var(--sans);letter-spacing:-.02em}
+.seg.au2{grid-template-columns:1fr 1fr}
+.authCard .btn.pri{width:100%;justify-content:center;padding:12px}
+.auErr{margin:0;color:var(--pome);font-size:14px;font-weight:600;min-height:0}
+.auErr:empty{display:none}
+.auErr.ok{color:#065f3b}
+.auLinks{display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.auLinks button{border:0;background:none;padding:0;color:var(--lapis);font-weight:600;font-size:14px}
+.auLinks button:hover{text-decoration:underline}
 
 /* ---------- PDF ---------- */
 #printRoot{display:none}
@@ -327,6 +344,23 @@ dialog::backdrop{background:rgba(10,16,32,.5)}
 </style>
 </head>
 <body>
+<div class="authWrap" id="auth">
+  <form class="authCard" onsubmit="event.preventDefault();auSubmit()">
+    <div class="aBrand"><div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 17a7 7 0 0114 0"/><path d="M2.5 17h19M12 5V3.5M5.6 7.6L4.5 6.5M18.4 7.6l1.1-1.1"/></svg></div><b>Мой день</b></div>
+    <p class="muted" id="auLead" style="margin:0">Войдите, чтобы открыть свои задачи на этом устройстве.</p>
+    <div class="seg au2" id="auTabs">
+      <label><input type="radio" name="aumode" value="in" checked onchange="auMode()"><span>Вход</span></label>
+      <label><input type="radio" name="aumode" value="up" onchange="auMode()"><span>Регистрация</span></label>
+    </div>
+    <label class="f" id="auEmailW">Электронная почта<input type="email" id="auEmail" autocomplete="email"></label>
+    <label class="f" id="auCodeW">Код из письма<input type="text" id="auCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456"></label>
+    <label class="f" id="auPassW"><span id="auPassL">Пароль</span><input type="password" id="auPass" autocomplete="current-password"></label>
+    <p class="auErr" id="auErr" role="alert"></p>
+    <button class="btn pri" id="auBtn" type="submit">Войти</button>
+    <div class="auLinks"><button type="button" id="auForgotB" onclick="auForgot()">Забыли пароль?</button><button type="button" id="auResendB" onclick="auResend()">Отправить код ещё раз</button><button type="button" id="auBackB" onclick="auStep=null;auMode()">Назад</button></div>
+    <p class="muted small" style="margin:0;text-align:center">После входа пароль на этом устройстве больше не спрашивается.</p>
+  </form>
+</div>
 <div class="app">
   <aside class="side">
     <div class="brand">
@@ -767,7 +801,7 @@ function viewData(){
    ${syCard()}
    <section class="card"><h2>Хранение</h2>
      <p class="muted" style="margin:0 0 6px">Сейчас: задач — ${S.tasks.length} (выполнено ${d}), планов — ${S.plans.length}, пунктов графика — ${S.routine.length}.</p>
-     <p class="muted small" style="margin:0">Данные сохраняются автоматически в этом браузере на этом устройстве. ${SY.gist?'Синхронизация включена: те же данные видны на всех подключённых устройствах.':'На другом устройстве они появятся, если включить синхронизацию выше.'}</p></section>
+     <p class="muted small" style="margin:0">Данные сохраняются автоматически в вашем аккаунте. Копия данных хранится и в этом браузере, поэтому планировщик открывается даже без интернета.</p></section>
    <section class="card"><h2>Резервная копия</h2>
      <div class="row"><button class="btn pri" onclick="backup()">${ic('dl')}Сохранить копию</button>
      <label class="btn" style="cursor:pointer">Загрузить копию<input type="file" accept=".json" class="hide" onchange="restore(this)"></label></div>
@@ -836,7 +870,7 @@ function doExport(){
 
 /* ======================= синхронизация между устройствами ======================= */
 const SYKEY='planner_sync_v1',SYFILE='planner-data.json',COLS=['tasks','plans','routine'];
-let SY={token:'',gist:'',last:0},syStatus='off',syEtag='',syBusy=false,syAgain=false,syPending=false,syTimer=null,SNAP={tasks:{},plans:{},routine:{},rdone:{}};
+let SY={last:0},syStatus='off',syEtag='',syBusy=false,syAgain=false,syPending=false,syTimer=null,SNAP={tasks:{},plans:{},routine:{},rdone:{}};
 const SYS={off:'Не подключена',sync:'Синхронизация…',ok:'Синхронизировано',offline:'Нет связи, повторю позже',badtoken:'Токен не подходит или отозван — подключите заново'};
 function stable(v){
   if(Array.isArray(v))return '['+v.map(stable).join(',')+']';
@@ -888,7 +922,7 @@ function mergeData(L,R){
   }
   return out;
 }
-function syLoad(){try{SY={token:'',gist:'',last:0,...JSON.parse(localStorage.getItem(SYKEY)||'{}')}}catch(e){}}
+function syLoad(){try{SY={last:0,...JSON.parse(localStorage.getItem(SYKEY)||'{}')}}catch(e){}}
 function sySave(){try{localStorage.setItem(SYKEY,JSON.stringify(SY))}catch(e){}}
 function setSy(s){if(s===syStatus)return;syStatus=s;footUpd();const el=$('syStat');if(el){el.className='tgst '+(s==='ok'?'ok':s==='sync'?'':'bad');el.lastChild.textContent=syLabel()}}
 function syLabel(){
@@ -896,84 +930,159 @@ function syLabel(){
   return SYS[syStatus];
 }
 function footUpd(){
-  const f=$('sideFoot');f.classList.toggle('bad',!storageOK||syStatus==='badtoken');
-  f.lastChild.textContent=!storageOK?'Не сохраняется!':SY.gist?(syStatus==='badtoken'?'Синхронизация остановлена':syStatus==='offline'?'Нет связи для синхронизации':'Синхронизация включена'):'Сохраняется в браузере';
+  const f=$('sideFoot');f.classList.toggle('bad',!storageOK);
+  f.lastChild.textContent=!storageOK?'Не сохраняется!':AU?(syStatus==='offline'?'Нет связи, данные на устройстве':AU.email):'Сохраняется в браузере';
 }
-function syQueue(){if(!SY.gist)return;syPending=true;clearTimeout(syTimer);syTimer=setTimeout(syRun,1500)}
-const gh=(path,opt={})=>fetch('https://api.github.com'+path,{...opt,cache:'no-store',headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+SY.token,...(opt.headers||{})}});
-async function syRun(){
-  if(!SY.token||!SY.gist)return;
-  if(syBusy){syAgain=true;return}
-  syBusy=true;const hadLocal=syPending;syPending=false;setSy('sync');
+function syQueue(){if(!AU)return;syPending=true;clearTimeout(syTimer);syTimer=setTimeout(syRun,1500)}
+
+/* ---------- аккаунты (Supabase) ---------- */
+const SB_URL='https://twzdzxhgkncjfjdkavtn.supabase.co',SB_KEY='sb_publishable_eju37gwXbZ53730UTBuLqA_nXA9VeV8',AUKEY='planner_auth_v1',OWKEY='planner_owner_v1';
+let AU=null,auRefP=null;
+function auLoad(){try{AU=JSON.parse(localStorage.getItem(AUKEY)||'null')}catch(e){AU=null}}
+function auSave(){try{if(AU)localStorage.setItem(AUKEY,JSON.stringify(AU));else localStorage.removeItem(AUKEY)}catch(e){}}
+function auSet(j){AU={access:j.access_token,refresh:j.refresh_token,exp:Math.floor(Date.now()/1000)+(j.expires_in||3600),uid:j.user.id,email:j.user.email};auSave()}
+const sbHead=()=>({'apikey':SB_KEY,'Content-Type':'application/json'});
+function auRefresh(){
+  if(auRefP)return auRefP;
+  auRefP=(async()=>{
+    auLoad();                                   /* другая вкладка могла уже обновить сессию */
+    if(!AU||AU.exp-60>Date.now()/1000)return;
+    const r=await fetch(SB_URL+'/auth/v1/token?grant_type=refresh_token',{method:'POST',headers:sbHead(),body:JSON.stringify({refresh_token:AU.refresh})});
+    if(r.ok)auSet(await r.json());
+    else if(r.status===400||r.status===401||r.status===403)auGate('Сессия истекла. Войдите снова — ваши данные на месте.');
+    else throw new Error('refresh '+r.status);
+  })().finally(()=>{auRefP=null});
+  return auRefP;
+}
+async function sb(path,opt={}){
+  if(AU&&AU.exp-60<Date.now()/1000)await auRefresh();
+  if(!AU)throw new Error('signed out');
+  return fetch(SB_URL+path,{...opt,cache:'no-store',headers:{...sbHead(),'Authorization':'Bearer '+AU.access,...(opt.headers||{})}});
+}
+function auGate(msg){
+  if(msg){AU=null;auSave()}
+  document.body.classList.toggle('locked',!AU);
+  if(!AU){$('auErr').textContent=msg||'';syStatus='off'}
+  footUpd();
+}
+let auStep=null;   /* null — вход/регистрация; {email,type:'signup'|'recovery'} — ввод кода из письма */
+const auUp=()=>document.querySelector('input[name=aumode]:checked').value==='up';
+function auMsg(t,ok){const e=$('auErr');e.textContent=t||'';e.classList.toggle('ok',!!ok)}
+function auMode(){
+  const up=auUp(),c=auStep,rec=c&&c.type==='recovery';
+  $('auTabs').classList.toggle('hide',!!c);$('auEmailW').classList.toggle('hide',!!c);$('auCodeW').classList.toggle('hide',!c);
+  $('auPassW').classList.toggle('hide',!!c&&!rec);$('auPassL').textContent=rec?'Новый пароль':'Пароль';
+  $('auForgotB').classList.toggle('hide',!!c||up);$('auResendB').classList.toggle('hide',!c);$('auBackB').classList.toggle('hide',!c);
+  $('auBtn').textContent=c?(rec?'Сменить пароль и войти':'Подтвердить'):up?'Создать аккаунт':'Войти';
+  $('auLead').textContent=c?`Мы отправили письмо с кодом на ${c.email}. Введите код${rec?' и новый пароль':''}. Письмо может попасть в «Спам».`
+    :up?'Создайте аккаунт — задачи будут доступны с любого устройства.':'Войдите, чтобы открыть свои задачи на этом устройстве.';
+  $('auPass').autocomplete=up||rec?'new-password':'current-password';auMsg('');
+  if(c){$('auCode').value='';if(rec)$('auPass').value='';$('auCode').focus()}
+}
+const AUERR=[[/already registered|already exists/i,'Такой аккаунт уже есть. Переключитесь на «Вход».'],[/invalid login|invalid_credentials/i,'Неверная почта или пароль.'],
+  [/expired|otp|token.*invalid|invalid.*token/i,'Код неверный или устарел. Запросите новый.'],
+  [/at least|weak|should be/i,'Пароль слишком простой: нужно минимум 6 символов.'],
+  [/rate limit|too many|security purposes/i,'Слишком часто. Подождите минуту и попробуйте снова.'],[/invalid.*email|email.*invalid/i,'Проверьте адрес почты.'],
+  [/signups? (not allowed|disabled)/i,'Регистрация сейчас закрыта.'],[/different from the old|same_password/i,'Новый пароль должен отличаться от старого.'],[/error sending|smtp/i,'Не удалось отправить письмо. Попробуйте позже.']];
+async function auCall(path,body,token){
+  const r=await fetch(SB_URL+path,{method:path==='/auth/v1/user'&&body?'PUT':body?'POST':'GET',cache:'no-store',headers:{...sbHead(),...(token?{'Authorization':'Bearer '+token}:{})},body:body?JSON.stringify(body):undefined});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){const m=String(j.msg||j.error_description||j.message||j.error||'')+' '+String(j.error_code||j.code||'');const hit=AUERR.find(([re])=>re.test(m));
+    throw {text:hit?hit[1]:'Не получилось'+(m.trim()?': '+m.trim():'. Попробуйте ещё раз.'),raw:m}}
+  return j;
+}
+async function auSubmit(){
+  const email=(auStep?auStep.email:$('auEmail').value.trim()).toLowerCase(),password=$('auPass').value;
+  $('auBtn').disabled=true;auMsg('');
   try{
-    const r=await gh('/gists/'+SY.gist,syEtag&&!hadLocal?{headers:{'If-None-Match':syEtag}}:{});
-    if(r.status===401){setSy('badtoken');return}
-    if(r.status===304){SY.last=Date.now();sySave();setSy('ok');return}
-    let remote={};
-    if(r.status===404){
-      const c=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Планировщик «Мой день» — данные (не удалять)',public:false,files:{[SYFILE]:{content:JSON.stringify(dataOf(S))}}})});
-      if(!c.ok)throw new Error('create');SY.gist=(await c.json()).id;syEtag='';
-      remote=dataOf(S);
-    }else{
-      if(!r.ok)throw new Error('http '+r.status);
-      const j=await r.json(),f=j.files&&j.files[SYFILE];
-      const txt=f?(f.truncated?await (await fetch(f.raw_url,{cache:'no-store'})).text():f.content):'';
-      try{remote=JSON.parse(txt||'{}')}catch(e){remote={}}
-      syEtag=r.headers.get('ETag')||'';
+    if(auStep){
+      const code=$('auCode').value.replace(/\s/g,''),rec=auStep.type==='recovery';
+      if(code.length<6){auMsg('Введите код из письма.');return}
+      if(rec&&password.length<6){auMsg('Новый пароль должен быть не короче 6 символов.');return}
+      const j=await auCall('/auth/v1/verify',{type:rec?'recovery':'signup',email,token:code});
+      if(rec)await auCall('/auth/v1/user',{password},j.access_token);
+      auStep=null;auSet(j);auMode();auEnter();return;
     }
+    if(!email||password.length<6){auMsg('Введите почту и пароль не короче 6 символов.');return}
+    if(auUp()){
+      const j=await auCall('/auth/v1/signup',{email,password});
+      if(j.access_token){auSet(j);auEnter();return}
+      if(j.identities&&!j.identities.length){auMsg('Такой аккаунт уже есть. Переключитесь на «Вход».');return}
+      auStep={email,type:'signup'};auMode();
+    }else{
+      try{auSet(await auCall('/auth/v1/token?grant_type=password',{email,password}));auEnter()}
+      catch(e){
+        if(/not confirmed/i.test(e.raw||'')){await auCall('/auth/v1/resend',{type:'signup',email}).catch(()=>{});auStep={email,type:'signup'};auMode();auMsg('Почта ещё не подтверждена. Мы отправили новый код.',true)}
+        else throw e;
+      }
+    }
+  }catch(e){auMsg(e.text||'Нет связи с сервером. Проверьте интернет.')}
+  finally{$('auBtn').disabled=false}
+}
+async function auForgot(){
+  const email=$('auEmail').value.trim().toLowerCase();
+  if(!email){auMsg('Сначала введите почту, на которую зарегистрирован аккаунт.');return}
+  try{await auCall('/auth/v1/recover',{email});auStep={email,type:'recovery'};auMode()}
+  catch(e){auMsg(e.text||'Нет связи с сервером. Проверьте интернет.')}
+}
+async function auResend(){
+  try{await auCall(auStep.type==='recovery'?'/auth/v1/recover':'/auth/v1/resend',auStep.type==='recovery'?{email:auStep.email}:{type:'signup',email:auStep.email});auMsg('Отправили новый код.',true)}
+  catch(e){auMsg(e.text||'Нет связи с сервером. Проверьте интернет.')}
+}
+/* переход по ссылке из письма: Supabase возвращает сессию в адресе после # */
+async function auFromLink(){
+  const h=new URLSearchParams(location.hash.slice(1));
+  if(!h.get('access_token')||!h.get('refresh_token'))return;
+  history.replaceState(null,'',location.pathname+location.search);
+  try{const u=await auCall('/auth/v1/user',null,h.get('access_token'));
+    auSet({access_token:h.get('access_token'),refresh_token:h.get('refresh_token'),expires_in:+h.get('expires_in')||3600,user:u});auEnter()}catch(e){}
+}
+function wipeLocal(){S={tasks:[],plans:[],routine:[],rdone:{},del:{},rdu:{}};snap();persist()}
+function auEnter(){
+  let owner='';try{owner=localStorage.getItem(OWKEY)||''}catch(e){}
+  if(owner&&owner!==AU.uid)wipeLocal();          /* на устройстве были данные другого аккаунта */
+  try{localStorage.setItem(OWKEY,AU.uid)}catch(e){}
+  $('auPass').value='';$('auCode').value='';auGate();view='day';render();syPending=true;syRun();
+}
+async function auLogout(){
+  if(!confirm(syStatus==='ok'&&!syPending?'Выйти из аккаунта на этом устройстве?':'Последние изменения могли не успеть отправиться. Всё равно выйти? Несохранённое на сервере пропадёт.'))return;
+  try{await sb('/auth/v1/logout',{method:'POST'})}catch(e){}
+  AU=null;auSave();try{localStorage.removeItem(OWKEY)}catch(e){}
+  wipeLocal();tgRun++;if(tgAbort)tgAbort.abort();TG={...TG0};tgSave();tgStatus='off';
+  auGate();render();
+}
+async function syRun(){
+  if(!AU)return;
+  if(syBusy){syAgain=true;return}
+  syBusy=true;const hadLocal=syPending,uid=AU.uid;syPending=false;setSy('sync');
+  try{
+    const r=await sb('/rest/v1/planner_data?select=data,updated_at');
+    if(!AU||AU.uid!==uid)return;
+    if(r.status===401){AU.exp=0;await auRefresh();syPending=syPending||hadLocal;return}
+    if(!r.ok)throw new Error('http '+r.status);
+    const rows=await r.json(),row=rows[0];
+    if(!AU||AU.uid!==uid)return;
+    if(row&&!hadLocal&&row.updated_at===syEtag){SY.last=Date.now();sySave();setSy('ok');return}
+    const remote=row&&row.data||{};
     /* дальше до записи в S нет ожиданий, поэтому правки пользователя не теряются */
     const merged=mergeData(S,remote),cm=canon(merged);
-    if(cm!==canon(S)){
-      S={...S,...merged};snap();persist();softRender();
-    }
-    if(cm!==canon(remote)){
-      const p=await gh('/gists/'+SY.gist,{method:'PATCH',body:JSON.stringify({files:{[SYFILE]:{content:JSON.stringify(merged)}}})});
-      if(p.status===401){setSy('badtoken');return}
-      if(!p.ok)throw new Error('patch '+p.status);
-      syEtag='';
-    }
+    if(cm!==canon(S)){S={...S,...merged};snap();persist();softRender()}
+    if(!row||cm!==canon(remote)){
+      const p=await sb('/rest/v1/planner_data?on_conflict=user_id',{method:'POST',headers:{'Prefer':'resolution=merge-duplicates,return=representation'},
+        body:JSON.stringify({user_id:uid,data:merged,updated_at:new Date().toISOString()})});
+      if(!p.ok)throw new Error('save '+p.status);
+      const saved=await p.json();syEtag=saved[0]?saved[0].updated_at:'';
+    }else syEtag=row.updated_at;
     SY.last=Date.now();sySave();setSy('ok');
-  }catch(e){setSy('offline')}
-  finally{syBusy=false;if(syAgain||syPending){syAgain=false;syQueue()}}
-}
-async function syConnect(){
-  const token=$('syToken').value.trim();
-  if(!/^(ghp_|github_pat_)[A-Za-z0-9_]{20,}$/.test(token)){toast('Это не похоже на токен GitHub. Он начинается с ghp_');return}
-  $('syBtn').disabled=true;SY={token,gist:'',last:0};
-  try{
-    const r=await gh('/gists?per_page=100');
-    if(r.status===401)throw {bad:1};
-    if(!r.ok)throw {};
-    const list=await r.json();let g=list.find(x=>x.files&&x.files[SYFILE]);
-    if(!g){
-      const c=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Планировщик «Мой день» — данные (не удалять)',public:false,files:{[SYFILE]:{content:JSON.stringify(dataOf(S))}}})});
-      if(!c.ok)throw {scope:1};
-      g=await c.json();
-    }
-    SY.gist=g.id;sySave();syEtag='';syStatus='sync';render();footUpd();
-    toast('Синхронизация подключена');syPending=true;syRun();
-  }catch(e){
-    SY={token:'',gist:'',last:0};sySave();render();
-    toast(e.bad?'Токен не подходит. Скопируйте его с GitHub целиком.':e.scope?'У токена нет права gist. Создайте токен по ссылке из шага 1.':'Не удалось связаться с GitHub. Проверьте интернет.');
-  }
-}
-function syDisconnect(){
-  if(!confirm('Отключить синхронизацию на этом устройстве? Данные здесь останутся.'))return;
-  SY={token:'',gist:'',last:0};sySave();syStatus='off';syEtag='';render();footUpd();toast('Синхронизация отключена');
+  }catch(e){if(AU)setSy('offline')}
+  finally{syBusy=false;if(AU&&(syAgain||syPending)){syAgain=false;syQueue()}}
 }
 function syCard(){
-  if(!SY.gist)return `<section class="card"><h2>Синхронизация между устройствами</h2>
-    <p class="muted" style="margin:0 0 12px">Чтобы задачи, планы и график были одинаковыми на компьютере и телефоне, подключите оба устройства к одному хранилищу в вашем GitHub. Это бесплатно, данные лежат в закрытой записи вашего аккаунта.</p>
-    <ol class="steps"><li>Откройте <a href="https://github.com/settings/tokens/new?scopes=gist&description=Planner%20sync" target="_blank" rel="noopener">страницу создания токена</a>. Галочка <b>gist</b> уже стоит. В поле Expiration выберите <b>No expiration</b> и нажмите <b>Generate token</b>.</li>
-    <li>Скопируйте токен (начинается с <b>ghp_</b>) и вставьте сюда.</li>
-    <li>На втором устройстве откройте этот же сайт и вставьте тот же токен.</li></ol>
-    <div class="row" style="flex-wrap:nowrap"><input type="text" id="syToken" placeholder="ghp_…" autocomplete="off" aria-label="Токен GitHub" onkeydown="if(event.key==='Enter')syConnect()">
-    <button class="btn pri" id="syBtn" onclick="syConnect()">Подключить</button></div>
-    <p class="muted small" style="margin:10px 0 0">Токен даёт доступ только к вашим записям gist. Он хранится в этом браузере и не попадает в резервную копию.</p></section>`;
-  return `<section class="card"><h2>Синхронизация между устройствами</h2>
+  return `<section class="card"><h2>Аккаунт</h2>
+    <p style="margin:0 0 10px;font-weight:600;overflow-wrap:anywhere">${esc(AU?AU.email:'')}</p>
     <div class="tgst ${syStatus==='ok'?'ok':syStatus==='sync'?'':'bad'}" id="syStat"><i></i><span>${syLabel()}</span></div>
-    <p class="muted" style="margin:10px 0 14px">Изменения отправляются автоматически и подтягиваются на других устройствах в течение минуты. Чтобы подключить ещё одно устройство, вставьте на нём тот же токен.</p>
-    <div class="row"><button class="btn pri" onclick="syPending=true;syRun()">Синхронизировать сейчас</button><button class="btn danger" onclick="syDisconnect()">Отключить</button></div></section>`;
+    <p class="muted" style="margin:10px 0 14px">Задачи, планы и график привязаны к аккаунту. Войдите с той же почтой на другом устройстве — всё появится там само.</p>
+    <div class="row"><button class="btn pri" onclick="syPending=true;syRun()">Синхронизировать сейчас</button><button class="btn danger" onclick="auLogout()">Выйти</button></div></section>`;
 }
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syRun()});
 window.addEventListener('focus',()=>syRun());
@@ -1296,7 +1405,7 @@ function viewBot(){
       <div class="row" style="flex-wrap:nowrap"><input type="text" id="tgToken" placeholder="123456789:AAH…" autocomplete="off" aria-label="Токен бота" onkeydown="if(event.key==='Enter')tgConnect()">
       <button class="btn pri" id="tgBtn" onclick="tgConnect()">Подключить</button></div>
       <p class="muted small" style="margin:10px 0 0">Токен хранится только в этом браузере и не попадает в резервную копию.</p>
-      <p class="muted small" style="margin:6px 0 0">Подключайте бота только на одном устройстве, например на компьютере. При включённой синхронизации задачи из Telegram появятся и на остальных.</p></section>${how}</div>`;
+      <p class="muted small" style="margin:6px 0 0">Подключайте бота только на одном устройстве, например на компьютере. Задачи из Telegram появятся и на остальных устройствах, где вы вошли в аккаунт.</p></section>${how}</div>`;
   const st=`<div class="tgst ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"><i></i><span>${TGS[tgStatus]}</span></div>`;
   if(!TG.chat)return `<div class="stack" style="max-width:640px">
     <section class="card"><h2>Остался один шаг</h2>${st}
@@ -1326,7 +1435,7 @@ function viewBot(){
 }
 window.addEventListener('storage',e=>{
   if(e.key===KEY&&e.newValue){try{const o=JSON.parse(e.newValue);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};snap()}catch(_){}softRender()}
-  if(e.key===SYKEY){syLoad();if(!SY.gist)syStatus='off';footUpd();if(view==='data')softRender()}
+  if(e.key===AUKEY){const was=AU&&AU.uid;auLoad();auGate();if((AU&&AU.uid)!==was){try{const o=JSON.parse(localStorage.getItem(KEY)||'{}');S={...S,...dataOf(o)};snap()}catch(_){}render();if(AU)syRun()}}
   if(e.key===TGKEY){tgLoad();if(!TG.token){tgRun++;if(tgAbort)tgAbort.abort();tgStatus='off'}else if(tgStatus==='off')tgLoop();softRender()}
 });
 
@@ -1341,7 +1450,7 @@ function render(){
   if(view==='done')renderDoneList();
 }
 ['dlgTask','dlgPlan','dlgExport','dlgMove','dlgR'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target.id===id)e.target.close()}));
-syLoad();load();tgLoad();save();render();tgLoop();syRun();setInterval(tgTick,30000);setTimeout(tgTick,4000);
+syLoad();auLoad();load();tgLoad();save();render();auGate();auMode();auFromLink();tgLoop();syRun();setInterval(tgTick,30000);setTimeout(tgTick,4000);
 </script>
 </body>
 </html>
