@@ -1,0 +1,974 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Мой день — планировщик</title>
+<style>
+:root{
+  --lapis:#1c2b5e;--lapis-2:#2a3d80;
+  --turq:#0e8c8c;--turq-soft:#dff3f1;
+  --saffron:#e9a23b;--saffron-soft:#fdf1da;
+  --pome:#c7384f;--pome-soft:#fbe6ea;
+  --ground:#f3f5f9;--surface:#fff;--ink:#1a1f36;--muted:#667085;--line:#e4e8f0;
+  --serif:"Iowan Old Style","Palatino Linotype",Palatino,Georgia,serif;
+  --sans:"Segoe UI",system-ui,-apple-system,Roboto,"Helvetica Neue",Arial,sans-serif;
+  --shadow:0 1px 2px rgba(28,43,94,.06),0 6px 20px -8px rgba(28,43,94,.12);
+}
+*{box-sizing:border-box}
+html{color-scheme:light}
+body{margin:0;background:var(--ground);color:var(--ink);font:15px/1.5 var(--sans);-webkit-font-smoothing:antialiased}
+button{font:inherit;color:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--turq);outline-offset:2px;border-radius:6px}
+svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+.app{display:grid;grid-template-columns:236px minmax(0,1fr);min-height:100vh}
+
+/* ---------- боковая панель ---------- */
+.side{position:sticky;top:0;height:100vh;padding:24px 14px;background:var(--surface);border-right:1px solid var(--line);display:flex;flex-direction:column;gap:22px}
+.brand{display:flex;align-items:center;gap:11px;padding:0 8px}
+.logo{width:36px;height:36px;border-radius:10px;background:var(--lapis);display:grid;place-items:center}
+.brand b{font:600 21px/1 var(--serif);letter-spacing:.2px}
+.nav{display:flex;flex-direction:column;gap:3px}
+.nav button{display:flex;align-items:center;gap:11px;border:0;background:none;padding:10px 12px;border-radius:10px;color:var(--muted);font-weight:600;text-align:left;width:100%}
+.nav button:hover{background:var(--ground);color:var(--ink)}
+.nav button.on{background:var(--lapis);color:#fff}
+.nav .badge{margin-left:auto;font-size:12px;min-width:22px;text-align:center;padding:1px 7px;border-radius:20px;background:var(--ground);color:var(--muted)}
+.nav .on .badge{background:rgba(255,255,255,.18);color:#fff}
+.nav .badge.red{background:var(--pome);color:#fff}
+.sideFoot{margin-top:auto;font-size:12px;color:var(--muted);padding:0 10px;display:flex;gap:8px;align-items:center}
+.sideFoot i{width:8px;height:8px;border-radius:50%;background:var(--turq);flex:none}
+.sideFoot.bad i{background:var(--pome)}
+
+/* ---------- основная часть ---------- */
+.main{padding:26px 32px 60px;max-width:1120px;width:100%}
+.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.top h1{margin:0;font:600 26px/1.15 var(--serif)}
+.acts{display:flex;gap:8px}
+.btn{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--line);background:var(--surface);padding:9px 15px;border-radius:10px;font-weight:600;transition:border-color .15s,background .15s}
+.btn:hover{border-color:var(--lapis)}
+.btn.pri{background:var(--lapis);border-color:var(--lapis);color:#fff}
+.btn.pri:hover{background:var(--lapis-2)}
+.btn.danger{color:var(--pome)}
+.btn.sm{padding:6px 11px;font-size:13px}
+
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:var(--shadow)}
+.card h2{margin:0 0 12px;font:600 16px/1.2 var(--sans)}
+.muted{color:var(--muted)}
+.small{font-size:13px}
+
+/* ---------- герой ---------- */
+.hero{position:relative;overflow:hidden;border-radius:22px;padding:28px 30px;color:#fff;margin-bottom:14px;
+  background-color:var(--lapis);
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='56'%3E%3Cg fill='none' stroke='%23fff' stroke-opacity='.08' stroke-width='1.2'%3E%3Crect x='12' y='12' width='32' height='32'/%3E%3Crect x='12' y='12' width='32' height='32' transform='rotate(45 28 28)'/%3E%3C/g%3E%3C/svg%3E"),
+    linear-gradient(120deg,var(--lapis) 40%,#243a86);
+  display:flex;justify-content:space-between;align-items:center;gap:22px}
+.hero .rel{font-size:14px;opacity:.78}
+.hero h2{margin:2px 0 4px;font:600 clamp(32px,5vw,46px)/1.05 var(--serif);color:#fff}
+.hero .wd{opacity:.85;font-size:16px;text-transform:capitalize}
+.hero .next{margin-top:18px;max-width:430px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);border-radius:12px;padding:10px 14px;font-size:14px}
+.hero .next small{display:block;opacity:.7;font-size:12px}
+.ring{position:relative;width:128px;height:128px;flex:none}
+.ring svg{transform:rotate(-90deg)}
+.ring b{position:absolute;inset:0;display:grid;place-items:center;font:600 30px var(--serif)}
+.ring span{position:absolute;left:0;right:0;bottom:30px;text-align:center;font-size:11px;opacity:.7}
+
+/* ---------- неделя ---------- */
+.weekCard{margin-bottom:14px;padding:14px 18px 12px}
+.weekHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.weekHead h2{margin:0}
+.weekHead .nv{display:flex;gap:4px;align-items:center}
+.ib{border:0;background:none;width:32px;height:32px;border-radius:8px;display:grid;place-items:center;color:var(--muted)}
+.ib:hover{background:var(--ground);color:var(--ink)}
+.week{display:grid;grid-template-columns:repeat(7,1fr);gap:8px}
+.col{border:0;background:none;padding:6px 2px;border-radius:12px;display:flex;flex-direction:column;align-items:center;gap:5px;color:var(--muted)}
+.col:hover{background:var(--ground)}
+.col.sel{background:var(--lapis);color:#fff}
+.col .bar{width:22px;height:46px;display:flex;align-items:flex-end}
+.col .bo{width:100%;min-height:5px;border-radius:6px;background:#dfe4ef;position:relative;overflow:hidden}
+.col.sel .bo{background:rgba(255,255,255,.25)}
+.col .bi{position:absolute;left:0;right:0;bottom:0;background:var(--turq)}
+.col.sel .bi{background:var(--saffron)}
+.col b{font-size:17px;color:var(--ink);line-height:1}
+.col.sel b{color:#fff}
+.col.today b::after{content:"";display:block;width:5px;height:5px;border-radius:50%;background:var(--turq);margin:3px auto 0}
+.col.sel.today b::after{background:var(--saffron)}
+.col small{font-size:12px}
+
+.split{display:grid;grid-template-columns:minmax(0,1.7fr) minmax(0,1fr);gap:14px;align-items:start}
+.stack{display:flex;flex-direction:column;gap:14px}
+
+/* ---------- задачи ---------- */
+.listHead{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px}
+.listHead h2{margin:0}
+.task{display:flex;gap:12px;align-items:flex-start;padding:13px 2px;border-top:1px solid var(--line)}
+.listHead + .task{border-top:0}
+.chk{width:24px;height:24px;border-radius:50%;border:2px solid #c3cadb;background:none;display:grid;place-items:center;flex:none;margin-top:1px;color:transparent;padding:0;transition:all .15s}
+.chk:hover{border-color:var(--turq)}
+.chk svg{width:14px;height:14px;stroke-width:3}
+.done .chk{background:var(--turq);border-color:var(--turq);color:#fff}
+.tb{flex:1;min-width:0}
+.tt{font-weight:600;overflow-wrap:anywhere}
+.done .tt{color:var(--muted);text-decoration:line-through;text-decoration-color:#b5bccd;font-weight:500}
+.tm{display:flex;flex-wrap:wrap;gap:6px 12px;margin-top:3px;font-size:13px;color:var(--muted);align-items:center}
+.tn{font-size:13px;color:var(--muted);margin-top:3px;overflow-wrap:anywhere}
+.pr{display:inline-flex;align-items:center;gap:6px;font-weight:600}
+.pr::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.pr1{color:var(--pome)}.pr2{color:#b97a12}.pr3{color:var(--turq)}
+.time{background:var(--ground);padding:1px 8px;border-radius:6px;font-weight:600;color:var(--ink)}
+.ta{display:flex;gap:0;flex:none}
+@media (hover:hover){.ta{opacity:0;transition:opacity .15s}.task:hover .ta,.task:focus-within .ta{opacity:1}}
+.empty{text-align:center;padding:34px 10px 24px}
+.empty svg.i{width:38px;height:38px;color:#b5bccd;margin-bottom:8px}
+.empty b{display:block;font-size:16px;margin-bottom:2px}
+.empty p{margin:0 0 14px;color:var(--muted)}
+
+.alert{display:flex;gap:14px;align-items:center;justify-content:space-between;flex-wrap:wrap;background:var(--pome-soft);border:1px solid #f3c3cc;border-radius:16px;padding:14px 18px;margin-bottom:14px}
+.alert b{color:var(--pome)}
+.alert div small{display:block;color:#7b3140}
+
+/* ---------- боковые карточки ---------- */
+.seg3{display:flex;height:12px;border-radius:8px;overflow:hidden;background:var(--ground);margin:2px 0 14px}
+.seg3 i{display:block;height:100%}
+.leg{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:14px}
+.leg b{font-variant-numeric:tabular-nums}
+.mini{padding:9px 0;border-top:1px solid var(--line);cursor:pointer}
+.mini:first-of-type{border-top:0}
+.mini .r{display:flex;justify-content:space-between;gap:8px;font-weight:600;font-size:14px}
+.pbar{height:7px;background:var(--ground);border-radius:6px;overflow:hidden;margin-top:6px}
+.pbar i{display:block;height:100%;background:var(--turq);border-radius:6px;transition:width .3s}
+.allclear{background:var(--turq-soft);border-color:#bfe3df}
+
+/* ---------- планы ---------- */
+.plans{display:grid;grid-template-columns:repeat(auto-fill,minmax(310px,1fr));gap:14px}
+.plan h3{margin:0;font:600 19px/1.25 var(--serif);overflow-wrap:anywhere}
+.plan .ph{display:flex;justify-content:space-between;gap:8px;align-items:flex-start}
+.chip{display:inline-block;font-size:12px;font-weight:600;padding:2px 9px;border-radius:20px;background:var(--ground);color:var(--muted)}
+.chip.ok{background:var(--turq-soft);color:#0a6a6a}
+.step{display:flex;gap:10px;align-items:center;padding:7px 0;border-top:1px solid var(--line)}
+.step .chk{width:20px;height:20px;border-width:2px;margin:0}
+.step .chk svg{width:12px;height:12px}
+.step span{flex:1;overflow-wrap:anywhere}
+.step.done span{color:var(--muted);text-decoration:line-through}
+.addStep{display:flex;gap:8px;margin-top:10px}
+
+/* ---------- поля ---------- */
+input[type=text],input[type=date],input[type=time],textarea,select{font:inherit;color:var(--ink);background:var(--surface);border:1px solid #d3d9e6;border-radius:10px;padding:9px 11px;width:100%;min-width:0}
+input:focus,textarea:focus,select:focus{outline:2px solid var(--turq);outline-offset:-1px;border-color:var(--turq)}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)}
+.fg{display:grid;gap:14px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.seg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.seg label{position:relative}
+.seg input{position:absolute;opacity:0;inset:0;cursor:pointer}
+.seg span{display:flex;align-items:center;justify-content:center;gap:6px;padding:9px;border:1px solid #d3d9e6;border-radius:10px;font-weight:600;font-size:14px;color:var(--muted)}
+.seg input:checked + span{border-color:var(--lapis);background:var(--lapis);color:#fff}
+.seg input:focus-visible + span{outline:2px solid var(--turq);outline-offset:2px}
+
+dialog{border:0;border-radius:20px;padding:0;max-width:480px;width:calc(100% - 28px);box-shadow:0 30px 80px -20px rgba(20,28,70,.5);color:var(--ink)}
+dialog::backdrop{background:rgba(20,28,60,.45)}
+dialog form{padding:22px}
+dialog h2{margin:0 0 16px;font:600 22px var(--serif)}
+.dFoot{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+
+/* ---------- прочее ---------- */
+.stats3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:14px}
+.stat b{display:block;font:600 34px/1.1 var(--serif)}
+.stat span{color:var(--muted);font-size:14px}
+.tools{display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap}
+.tools input{flex:1 1 220px;width:auto}.tools select{width:auto}
+.dayGroup{margin-bottom:14px}
+.dayGroup h2{display:flex;justify-content:space-between}
+.dayGroup h2 span{font-weight:500;color:var(--muted);font-size:14px}
+.row{display:flex;gap:10px;flex-wrap:wrap}
+.warn{background:var(--saffron-soft);border:1px solid #f1d49b;color:#7a5410;padding:10px 14px;border-radius:12px;margin-bottom:14px;font-size:14px}
+#toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);background:var(--ink);color:#fff;padding:10px 12px 10px 18px;border-radius:12px;font-weight:600;font-size:14px;opacity:0;pointer-events:none;transition:all .25s;z-index:50;display:flex;align-items:center;gap:14px;max-width:calc(100% - 28px)}
+#toast.show{opacity:1;transform:translate(-50%,0);pointer-events:auto}
+#toast button{border:0;background:rgba(255,255,255,.16);color:#fff;font-weight:700;padding:6px 12px;border-radius:8px}
+#toast button:hover{background:rgba(255,255,255,.28)}
+.quick{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+@media (max-width:760px){#toast{bottom:84px}}
+.nav .dot{margin-left:auto;width:9px;height:9px;border-radius:50%;background:var(--saffron)}
+.nav .dot.ok{background:#2bb673}.nav .dot.bad{background:var(--pome)}
+.tgst{display:inline-flex;align-items:center;gap:8px;font-weight:600;font-size:14px;padding:5px 12px;border-radius:20px;background:var(--saffron-soft);color:#7a5410}
+.tgst i{width:8px;height:8px;border-radius:50%;background:currentColor}
+.tgst.ok{background:var(--turq-soft);color:#0a6a6a}.tgst.bad{background:var(--pome-soft);color:var(--pome)}
+.steps{margin:0 0 16px;padding-left:22px;display:grid;gap:8px}
+.steps a,.small a{color:var(--turq);font-weight:600}
+a.btn{text-decoration:none;color:var(--ink)}a.btn.pri{color:#fff}
+.opt{display:flex;align-items:center;gap:10px;padding:9px 0;border-top:1px solid var(--line);font-weight:600}
+h2 + .opt{border-top:0}
+.opt input[type=checkbox]{width:18px;height:18px;accent-color:#0e8c8c;flex:none}
+.opt span{flex:1}.opt input[type=time]{width:auto}
+.ex{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap}
+h2 + .ex{border-top:0}
+.ex span{color:var(--muted);font-size:14px}
+.hide{display:none!important}
+
+@media (max-width:900px){
+  .split{grid-template-columns:1fr}
+}
+@media (max-width:760px){
+  .app{grid-template-columns:1fr}
+  .side{position:fixed;inset:auto 0 0 0;height:auto;flex-direction:row;padding:6px 8px calc(6px + env(safe-area-inset-bottom));border-right:0;border-top:1px solid var(--line);z-index:20;gap:0}
+  .brand,.sideFoot{display:none}
+  .nav{flex-direction:row;width:100%;gap:2px}
+  .nav button{flex-direction:column;gap:2px;font-size:11px;padding:7px 2px;align-items:center;text-align:center;position:relative}
+  .nav .dot{position:absolute;top:5px;left:60%;margin:0}
+  .nav .badge{position:absolute;top:2px;left:55%;margin:0;font-size:10px;min-width:18px;padding:0 5px}
+  .main{padding:18px 14px 96px}
+  .hero{padding:22px 20px}
+  .ring{position:absolute;top:20px;right:18px;width:84px;height:84px}.ring svg{width:84px;height:84px}
+  .ring b{font-size:19px}
+  .stats3{grid-template-columns:1fr}
+  .two{grid-template-columns:1fr}
+  .top h1{font-size:23px}
+  .col .bar{width:16px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* ---------- PDF ---------- */
+#printRoot{display:none}
+@media print{
+  html,body{background:#fff}
+  .app,#toast,dialog{display:none!important}
+  #printRoot{display:block;font:12.5px/1.45 var(--sans);color:#000}
+  #printRoot h1{font:600 22px var(--serif);margin:0 0 2px;color:#1c2b5e}
+  #printRoot .pm{color:#555;font-size:11px;margin-bottom:14px;padding-bottom:8px;border-bottom:2px solid #1c2b5e}
+  #printRoot h2{font:600 15px var(--sans);margin:18px 0 6px;color:#1c2b5e}
+  #printRoot h4{font-size:12.5px;margin:12px 0 4px}
+  #printRoot table{width:100%;border-collapse:collapse}
+  #printRoot td{padding:4px 5px;border-bottom:1px solid #ddd;vertical-align:top}
+  #printRoot td.c{width:22px;font-size:15px}
+  #printRoot td.tm{width:50px;color:#555}
+  #printRoot td.pr{width:78px;color:#555;font-size:11px}
+  #printRoot .dn{text-decoration:line-through;color:#777}
+  #printRoot .plan{break-inside:avoid;margin-bottom:12px}
+  #printRoot tr{break-inside:avoid}
+  @page{margin:14mm}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="side">
+    <div class="brand">
+      <div class="logo"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.7"><rect x="5" y="5" width="14" height="14"/><rect x="5" y="5" width="14" height="14" transform="rotate(45 12 12)"/></svg></div>
+      <b>Мой день</b>
+    </div>
+    <nav class="nav" id="nav"></nav>
+    <div class="sideFoot" id="sideFoot"><i></i><span>Сохраняется в браузере</span></div>
+  </aside>
+  <main class="main">
+    <div class="warn hide" id="storageWarn">Браузер не разрешает сохранять данные (возможно, приватный режим). После закрытия вкладки данные пропадут — сделайте копию на вкладке «Данные».</div>
+    <div class="top"><h1 id="title"></h1><div class="acts" id="acts"></div></div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<!-- Задача -->
+<dialog id="dlgTask">
+  <form onsubmit="event.preventDefault();saveTask()">
+    <h2 id="dtTitle">Новая задача</h2>
+    <div class="fg">
+      <label class="f">Что нужно сделать<input type="text" id="tTitle" required autocomplete="off"></label>
+      <label class="f">Заметка<textarea id="tNote" rows="2"></textarea></label>
+      <div class="two">
+        <label class="f">Дата<input type="date" id="tDate" required></label>
+        <label class="f">Время<input type="time" id="tTime"></label>
+      </div>
+      <div class="f" style="display:flex;flex-direction:column;gap:5px;font-size:13px;font-weight:600;color:var(--muted)">Важность
+        <div class="seg">
+          <label><input type="radio" name="prio" value="1"><span>Высокая</span></label>
+          <label><input type="radio" name="prio" value="2" checked><span>Средняя</span></label>
+          <label><input type="radio" name="prio" value="3"><span>Низкая</span></label>
+        </div>
+      </div>
+      <label class="f" id="repWrap">Повторять
+        <select id="tRepeat">
+          <option value="">Не повторять</option>
+          <option value="daily">Каждый день, 7 дней</option>
+          <option value="weekdays">По будням, 2 недели</option>
+          <option value="weekly">Раз в неделю, 4 раза</option>
+        </select>
+      </label>
+    </div>
+    <div class="dFoot">
+      <button type="button" class="btn" onclick="dlgTask.close()">Отмена</button>
+      <button type="submit" class="btn pri" id="dtSave">Добавить</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- Перенос -->
+<dialog id="dlgMove">
+  <form onsubmit="event.preventDefault();moveToPicked()">
+    <h2>Перенести задачу</h2>
+    <p class="muted" id="mvName" style="margin:-8px 0 14px;overflow-wrap:anywhere"></p>
+    <div class="quick" id="mvQuick"></div>
+    <label class="f">Другая дата<input type="date" id="mvDate" required></label>
+    <div class="dFoot">
+      <button type="button" class="btn" onclick="dlgMove.close()">Отмена</button>
+      <button type="submit" class="btn pri">Перенести</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- План -->
+<dialog id="dlgPlan">
+  <form onsubmit="event.preventDefault();savePlan()">
+    <h2 id="dpTitle">Новый план</h2>
+    <div class="fg">
+      <label class="f">Название цели<input type="text" id="pTitle" required autocomplete="off"></label>
+      <label class="f">Описание<textarea id="pGoal" rows="3" placeholder="Что должно получиться в итоге"></textarea></label>
+      <div class="two">
+        <label class="f">Начало<input type="date" id="pStart"></label>
+        <label class="f">Срок<input type="date" id="pEnd"></label>
+      </div>
+    </div>
+    <div class="dFoot">
+      <button type="button" class="btn" onclick="dlgPlan.close()">Отмена</button>
+      <button type="submit" class="btn pri" id="dpSave">Добавить</button>
+    </div>
+  </form>
+</dialog>
+
+<!-- PDF -->
+<dialog id="dlgExport">
+  <form onsubmit="event.preventDefault();doExport()">
+    <h2>Скачать PDF</h2>
+    <div class="fg">
+      <label class="f">Что включить
+        <select id="exWhat"><option value="both">Задачи и планы</option><option value="tasks">Только задачи</option><option value="plans">Только планы</option></select>
+      </label>
+      <label class="f">Период задач
+        <select id="exPeriod">
+          <option value="day">Выбранный день</option>
+          <option value="week">Неделя выбранного дня</option>
+          <option value="month">Месяц выбранного дня</option>
+          <option value="all">Все задачи</option>
+        </select>
+      </label>
+      <label style="display:flex;gap:10px;align-items:center;font-weight:600"><input type="checkbox" id="exDone" checked style="width:18px;height:18px;accent-color:#0e8c8c"> Включить выполненные</label>
+      <p class="muted small" style="margin:0">Откроется окно печати. В нём выберите «Сохранить как PDF».</p>
+    </div>
+    <div class="dFoot">
+      <button type="button" class="btn" onclick="dlgExport.close()">Отмена</button>
+      <button type="submit" class="btn pri">Создать PDF</button>
+    </div>
+  </form>
+</dialog>
+
+<div id="toast" role="status"></div>
+<div id="printRoot"></div>
+
+<script>
+/* ======================= данные ======================= */
+const KEY='planner_v1', SEEDKEY='planner_seeded_v1';
+const SEED=[];
+const SEED_PLANS=[];
+let S={tasks:[],plans:[]},storageOK=true;
+let view='day',selDate=iso(new Date()),editTask=null,editPlan=null,doneQ='',doneRange='all';
+
+function load(){
+  let seeded=false;
+  try{
+    const raw=localStorage.getItem(KEY);
+    if(raw){const o=JSON.parse(raw);S.tasks=o.tasks||[];S.plans=o.plans||[]}
+    seeded=!!localStorage.getItem(SEEDKEY);
+  }catch(e){storageOK=false}
+  if(!seeded){
+    const ids=new Set(S.tasks.map(t=>t.id)),pids=new Set(S.plans.map(p=>p.id));
+    SEED.forEach((t,i)=>{if(!ids.has(t.id))S.tasks.push({time:'',created:1794500000000+i,...t})});
+    SEED_PLANS.forEach(p=>{if(!pids.has(p.id))S.plans.push({created:1794500000000,...p})});
+    save();
+    try{localStorage.setItem(SEEDKEY,'1')}catch(e){}
+  }
+}
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify(S));storageOK=true}catch(e){storageOK=false}
+  $('storageWarn').classList.toggle('hide',storageOK);
+  $('sideFoot').classList.toggle('bad',!storageOK);
+  $('sideFoot').lastChild.textContent=storageOK?'Сохраняется в браузере':'Не сохраняется!';
+}
+
+/* ======================= утилиты ======================= */
+const $=id=>document.getElementById(id);
+function iso(d){const z=n=>String(n).padStart(2,'0');return d.getFullYear()+'-'+z(d.getMonth()+1)+'-'+z(d.getDate())}
+function parse(s){const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
+function addDays(s,n){const d=parse(s);d.setDate(d.getDate()+n);return iso(d)}
+function weekStart(s){const d=parse(s);d.setDate(d.getDate()-(d.getDay()+6)%7);return iso(d)}
+const MON=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+const MONN=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+const WD=['Пн','Вт','Ср','Чт','Пт','Сб','Вс'];
+const WDF=['воскресенье','понедельник','вторник','среда','четверг','пятница','суббота'];
+const fmt=s=>{const d=parse(s);return d.getDate()+' '+MON[d.getMonth()]+(d.getFullYear()!==new Date().getFullYear()?' '+d.getFullYear():'')};
+const fmtLong=s=>WDF[parse(s).getDay()]+', '+fmt(s);
+const esc=t=>String(t??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+const PR={1:'Высокая',2:'Средняя',3:'Низкая'};
+const today=()=>iso(new Date());
+const IC={
+ cal:'<rect x="3" y="5" width="18" height="16" rx="3"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+ plans:'<path d="M4 7l2 2 3-3M12 8h8M4 16l2 2 3-3M12 17h8"/>',
+ done:'<circle cx="12" cy="12" r="9"/><path d="M8 12.5l3 3 5-6"/>',
+ data:'<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3.1 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3.1 3 7 3s7-1.3 7-3"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
+ dl:'<path d="M12 4v11M7 11l5 5 5-5M5 20h14"/>',
+ edit:'<path d="M4 20l4-1 11-11-3-3L5 16l-1 4z"/>',
+ trash:'<path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13"/>',
+ next:'<path d="M5 12h14M13 6l6 6-6 6"/>',
+ undo:'<path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3"/>',
+ chk:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+ left:'<path d="M15 6l-6 6 6 6"/>',right:'<path d="M9 6l6 6-6 6"/>',
+ send:'<path d="M21 4L3 11l6 2.5L11 20l3-5 4 3 3-14zM9 13.5L21 4"/>',
+ inbox:'<path d="M4 13l2-8h12l2 8M4 13v6h16v-6M4 13h5l1 2h4l1-2h5"/>'
+};
+const ic=n=>`<svg class="i" viewBox="0 0 24 24">${IC[n]}</svg>`;
+let toastT;
+function toast(m,undo){
+  const t=$('toast');t.innerHTML='<span></span>';t.firstChild.textContent=m;
+  if(undo){const b=document.createElement('button');b.textContent='Отменить';b.onclick=()=>{undo();save();render();t.classList.remove('show');toast('Действие отменено')};t.appendChild(b)}
+  t.classList.add('show');clearTimeout(toastT);toastT=setTimeout(()=>t.classList.remove('show'),undo?7000:2200);
+}
+
+/* ======================= навигация ======================= */
+function go(v){view=v;render();window.scrollTo(0,0)}
+function renderNav(){
+  const t=today(),open=S.tasks.filter(x=>!x.done&&x.date===t).length,od=S.tasks.filter(x=>!x.done&&x.date<t).length;
+  const items=[['day','cal','День',od?`<span class="badge red">${od}</span>`:(open?`<span class="badge">${open}</span>`:'')],['plans','plans','Планы',''],['done','done','Готово',''],['bot','send','Бот',TG.token?`<span class="dot ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"></span>`:''],['data','data','Данные','']];
+  $('nav').innerHTML=items.map(([k,i,l,b])=>`<button class="${view===k?'on':''}" onclick="go('${k}')">${ic(i)}<span>${l}</span>${b}</button>`).join('');
+}
+
+/* ======================= задачи ======================= */
+const dayTasks=d=>S.tasks.filter(t=>t.date===d);
+const sortT=(a,b)=>(a.done-b.done)||((a.time||'99:99').localeCompare(b.time||'99:99'))||(a.prio-b.prio)||((a.created||0)-(b.created||0));
+
+function openTask(id){
+  editTask=id||null;const t=id?S.tasks.find(x=>x.id===id):null;
+  $('dtTitle').textContent=t?'Изменить задачу':'Новая задача';
+  $('dtSave').textContent=t?'Сохранить':'Добавить';
+  $('tTitle').value=t?t.title:'';$('tNote').value=t?t.note||'':'';
+  $('tDate').value=t?t.date:selDate;$('tTime').value=t?t.time||'':'';
+  document.querySelector(`input[name=prio][value="${t?t.prio:2}"]`).checked=true;
+  $('tRepeat').value='';$('repWrap').classList.toggle('hide',!!t);
+  $('dlgTask').showModal();$('tTitle').focus();
+}
+function saveTask(){
+  const title=$('tTitle').value.trim();if(!title)return;
+  const date=$('tDate').value||selDate;
+  const base={title,date,time:$('tTime').value,prio:+document.querySelector('input[name=prio]:checked').value,note:$('tNote').value.trim()};
+  if(editTask){const et=S.tasks.find(t=>t.id===editTask);if(et.date!==base.date)et.prevDate=et.date;Object.assign(et,base);toast('Изменения сохранены')}
+  else{
+    const rep=$('tRepeat').value;let dates=[date];
+    if(rep==='daily')dates=[...Array(7)].map((_,i)=>addDays(date,i));
+    if(rep==='weekly')dates=[...Array(4)].map((_,i)=>addDays(date,7*i));
+    if(rep==='weekdays'){dates=[];for(let i=0;i<14;i++){const d=addDays(date,i);if((parse(d).getDay()+6)%7<5)dates.push(d)}}
+    dates.forEach(d=>S.tasks.push({id:uid(),done:false,created:Date.now(),...base,date:d}));
+    toast(dates.length>1?`Добавлено задач: ${dates.length}`:'Задача добавлена');
+  }
+  selDate=date;save();$('dlgTask').close();render();
+}
+function toggleTask(id){
+  const t=S.tasks.find(x=>x.id===id),was={done:t.done,doneAt:t.doneAt};
+  t.done=!t.done;t.doneAt=t.done?today():null;save();render();
+  toast(t.done?'Задача выполнена':'Задача возвращена в работу',()=>Object.assign(t,was));
+}
+function delTask(id){
+  const i=S.tasks.findIndex(x=>x.id===id),t=S.tasks[i];
+  S.tasks.splice(i,1);save();render();
+  toast('Задача удалена',()=>S.tasks.splice(Math.min(i,S.tasks.length),0,t));
+}
+function moveTask(id,date){
+  const t=S.tasks.find(x=>x.id===id);if(!date||date===t.date)return;
+  const old={date:t.date,prevDate:t.prevDate};
+  t.prevDate=t.date;t.date=date;selDate=date;save();render();
+  toast('Перенесено на '+fmt(date),()=>{Object.assign(t,old);selDate=old.date});
+}
+function openMove(id){
+  const t=S.tasks.find(x=>x.id===id),n=today();
+  $('mvName').textContent=t.title;
+  const nm=addDays(n,(8-(parse(n).getDay()||7))%7||7);
+  const q=[['Сегодня',n],['Завтра',addDays(n,1)],['Послезавтра',addDays(n,2)],['Следующий понедельник',nm]]
+    .filter(([,d])=>d!==t.date).map(([l,d])=>`<button type="button" class="btn sm" onclick="moveTask('${id}','${d}');dlgMove.close()">${l}</button>`);
+  if(t.prevDate&&t.prevDate!==t.date)q.unshift(`<button type="button" class="btn sm pri" onclick="moveTask('${id}','${t.prevDate}');dlgMove.close()">${ic('undo')}Вернуть на ${fmt(t.prevDate)}</button>`);
+  $('mvQuick').innerHTML=q.join('');
+  $('mvDate').value=t.date;mvId=id;$('dlgMove').showModal();
+}
+let mvId=null;
+function moveToPicked(){moveTask(mvId,$('mvDate').value);$('dlgMove').close()}
+function moveOverdue(){
+  const t=today(),snap=S.tasks.filter(x=>!x.done&&x.date<t).map(x=>[x,x.date,x.prevDate]);
+  snap.forEach(([x,d])=>{x.prevDate=d;x.date=t});save();render();
+  toast('Просроченные перенесены на сегодня',()=>snap.forEach(([x,d,p])=>{x.date=d;x.prevDate=p}));
+}
+
+function taskHTML(t,opt={}){
+  return `<div class="task ${t.done?'done':''}">
+    <button class="chk" aria-label="${t.done?'Вернуть в работу':'Отметить выполненной'}" onclick="toggleTask('${t.id}')">${ic('chk')}</button>
+    <div class="tb"><div class="tt">${esc(t.title)}</div>
+      <div class="tm"><span class="pr pr${t.prio}">${PR[t.prio]}</span>${t.time?`<span class="time">${esc(t.time)}</span>`:''}${opt.date?`<span>${esc(fmt(t.date))}</span>`:''}</div>
+      ${t.note?`<div class="tn">${esc(t.note)}</div>`:''}</div>
+    <div class="ta">
+      ${t.done?'':`<button class="ib" title="Перенести на другой день" onclick="openMove('${t.id}')">${ic('cal')}</button>`}
+      <button class="ib" title="Изменить" onclick="openTask('${t.id}')">${ic('edit')}</button>
+      <button class="ib" title="Удалить" onclick="delTask('${t.id}')">${ic('trash')}</button></div>
+  </div>`;
+}
+
+function heroHTML(){
+  const t=today(),list=dayTasks(selDate),done=list.filter(x=>x.done).length,total=list.length,pct=total?Math.round(done/total*100):0;
+  const rel=selDate===t?'Сегодня':selDate===addDays(t,1)?'Завтра':selDate===addDays(t,-1)?'Вчера':'';
+  const h=new Date().getHours(),greet=h<5?'Доброй ночи':h<12?'Доброе утро':h<18?'Добрый день':'Добрый вечер';
+  const next=list.filter(x=>!x.done).sort(sortT)[0];
+  let msg;
+  if(!total)msg='На этот день ничего не запланировано';
+  else if(done===total)msg='Всё выполнено. Хороший день!';
+  else msg=`Осталось ${total-done} из ${total}`;
+  const R=52,C=2*Math.PI*R;
+  const d=parse(selDate);
+  return `<section class="hero">
+    <div>
+      <div class="rel">${selDate===t?greet:rel||'&nbsp;'}</div>
+      <h2>${d.getDate()} ${MON[d.getMonth()]}</h2>
+      <div class="wd">${WDF[d.getDay()]}${rel&&selDate===t?'':''}</div>
+      <div class="next"><small>${esc(msg)}</small>${next?`<b>${next.time?esc(next.time)+' · ':''}${esc(next.title)}</b>`:(total?'<b>Задач больше нет</b>':'<b>Добавьте первую задачу</b>')}</div>
+    </div>
+    <div class="ring" aria-label="Выполнено ${pct}%">
+      <svg width="128" height="128" viewBox="0 0 128 128"><circle cx="64" cy="64" r="${R}" fill="none" stroke="rgba(255,255,255,.16)" stroke-width="10"/>
+      <circle cx="64" cy="64" r="${R}" fill="none" stroke="#f2b84b" stroke-width="10" stroke-linecap="round" stroke-dasharray="${C}" stroke-dashoffset="${C*(1-pct/100)}" style="transition:stroke-dashoffset .5s"/></svg>
+      <b>${pct}%</b>
+    </div>
+  </section>`;
+}
+function weekHTML(){
+  const ws=weekStart(selDate),t=today();
+  const days=[...Array(7)].map((_,i)=>addDays(ws,i));
+  const max=Math.max(3,...days.map(d=>dayTasks(d).length));
+  const a=parse(days[0]),b=parse(days[6]);
+  const lbl=a.getMonth()===b.getMonth()?`${a.getDate()}–${b.getDate()} ${MON[a.getMonth()]}`:`${a.getDate()} ${MON[a.getMonth()].slice(0,3)} – ${b.getDate()} ${MON[b.getMonth()].slice(0,3)}`;
+  return `<section class="card weekCard">
+    <div class="weekHead"><h2>Неделя, ${lbl}</h2>
+      <div class="nv"><button class="ib" aria-label="Предыдущая неделя" onclick="shift(-7)">${ic('left')}</button>
+      <button class="btn sm" onclick="selDate=today();render()">Сегодня</button>
+      <button class="ib" aria-label="Следующая неделя" onclick="shift(7)">${ic('right')}</button></div></div>
+    <div class="week">${days.map((d,i)=>{
+      const l=dayTasks(d),dn=l.filter(x=>x.done).length;
+      return `<button class="col ${d===selDate?'sel':''} ${d===t?'today':''}" onclick="selDate='${d}';render()" aria-label="${esc(fmtLong(d))}, задач: ${l.length}">
+        <small>${WD[i]}</small>
+        <div class="bar"><div class="bo" style="height:${l.length?Math.max(12,l.length/max*100):0}%"><div class="bi" style="height:${l.length?dn/l.length*100:0}%"></div></div></div>
+        <b>${parse(d).getDate()}</b></button>`}).join('')}</div>
+  </section>`;
+}
+function shift(n){selDate=addDays(selDate,n);render()}
+
+function viewDay(){
+  const t=today(),list=dayTasks(selDate).sort(sortT);
+  const od=S.tasks.filter(x=>!x.done&&x.date<t);
+  const open=S.tasks.filter(x=>!x.done),c={1:0,2:0,3:0};open.forEach(x=>c[x.prio]++);
+  const tot=open.length||1,col={1:'var(--pome)',2:'var(--saffron)',3:'var(--turq)'};
+  const plans=S.plans.slice(0,3);
+  return heroHTML()+weekHTML()+`<div class="split"><div>
+    ${od.length?`<div class="alert"><div><b>Просрочено: ${od.length}</b><small>${esc(od.slice(0,2).map(x=>x.title).join('; '))}${od.length>2?'…':''}</small></div>
+      <button class="btn sm" onclick="moveOverdue()">Перенести на сегодня</button></div>`:''}
+    <section class="card">
+      <div class="listHead"><h2>${selDate===t?'Задачи на сегодня':'Задачи на '+fmt(selDate)}</h2><span class="muted small">${list.filter(x=>x.done).length} из ${list.length}</span></div>
+      ${list.length?list.map(x=>taskHTML(x)).join(''):`<div class="empty">${ic('inbox')}<b>На этот день пусто</b><p>Запишите, что нужно сделать, или выберите другой день.</p><button class="btn pri" onclick="openTask()">${ic('plus')}Добавить задачу</button></div>`}
+      ${od.length?`<div class="listHead" style="margin-top:18px"><h2 style="color:var(--pome)">Просроченные</h2></div>${od.sort((a,b)=>a.date.localeCompare(b.date)).map(x=>taskHTML(x,{date:true})).join('')}`:''}
+    </section></div>
+    <div class="stack">
+      <section class="card"><h2>Открытые задачи по важности</h2>
+        <div class="seg3">${[1,2,3].map(k=>`<i style="width:${c[k]/tot*100}%;background:${col[k]}"></i>`).join('')}</div>
+        ${[1,2,3].map(k=>`<div class="leg"><span class="pr pr${k}">${PR[k]}</span><b>${c[k]}</b></div>`).join('')}
+      </section>
+      <section class="card"><h2>Планы</h2>
+        ${plans.length?plans.map(p=>{const pc=planPct(p);return `<div class="mini" onclick="go('plans')"><div class="r"><span>${esc(p.title)}</span><span>${pc}%</span></div><div class="pbar"><i style="width:${pc}%"></i></div></div>`}).join(''):`<p class="muted small" style="margin:0 0 10px">Планов пока нет. Разбейте большую цель на шаги.</p><button class="btn sm" onclick="go('plans')">Создать план</button>`}
+      </section>
+    </div></div>`;
+}
+
+/* ======================= завершённые ======================= */
+function viewDone(){
+  const t=today(),all=S.tasks.filter(x=>x.done),wk=addDays(t,-6);
+  const w=all.filter(x=>(x.doneAt||x.date)>=wk).length,td=all.filter(x=>(x.doneAt||x.date)===t).length;
+  return `<div class="stats3">
+    <div class="card stat"><b>${td}</b><span>выполнено сегодня</span></div>
+    <div class="card stat"><b>${w}</b><span>за последние 7 дней</span></div>
+    <div class="card stat"><b>${all.length}</b><span>всего выполнено</span></div></div>
+    <div class="tools"><input type="text" id="dSearch" placeholder="Поиск по выполненным" value="${esc(doneQ)}" oninput="doneQ=this.value;renderDoneList()" aria-label="Поиск">
+    <select id="dRange" onchange="doneRange=this.value;renderDoneList()" aria-label="Период"><option value="all">За всё время</option><option value="week">7 дней</option><option value="month">30 дней</option></select></div>
+    <div id="doneList"></div>`;
+}
+function renderDoneList(){
+  const t=today(),q=doneQ.trim().toLowerCase();
+  const from=doneRange==='week'?addDays(t,-6):doneRange==='month'?addDays(t,-29):'0000-00-00';
+  const list=S.tasks.filter(x=>x.done&&(x.doneAt||x.date)>=from&&(!q||(x.title+' '+(x.note||'')).toLowerCase().includes(q)));
+  const g={};list.forEach(x=>{const k=x.doneAt||x.date;(g[k]=g[k]||[]).push(x)});
+  $('doneList').innerHTML=list.length?Object.keys(g).sort().reverse().map(d=>`<section class="card dayGroup"><h2>${esc(fmtLong(d))}<span>${g[d].length}</span></h2>
+    ${g[d].map(x=>`<div class="task done"><button class="chk" aria-label="Вернуть в работу" onclick="toggleTask('${x.id}')">${ic('chk')}</button>
+      <div class="tb"><div class="tt">${esc(x.title)}</div><div class="tm"><span>Планировалось на ${esc(fmt(x.date))}</span></div>${x.note?`<div class="tn">${esc(x.note)}</div>`:''}</div>
+      <div class="ta"><button class="ib" title="Вернуть в работу" onclick="toggleTask('${x.id}')">${ic('undo')}</button><button class="ib" title="Удалить" onclick="delTask('${x.id}')">${ic('trash')}</button></div></div>`).join('')}</section>`).join('')
+    :`<section class="card empty">${ic('done')}<b>${q?'Ничего не найдено':'Пока нет выполненных задач'}</b><p>${q?'Попробуйте другое слово или период.':'Отмечайте задачи кружком — они появятся здесь.'}</p></section>`;
+  $('dRange').value=doneRange;
+}
+
+/* ======================= планы ======================= */
+const planPct=p=>p.steps.length?Math.round(p.steps.filter(s=>s.done).length/p.steps.length*100):0;
+const planPeriod=p=>p.start||p.end?`${p.start?fmt(p.start):'…'} — ${p.end?fmt(p.end):'без срока'}`:'';
+function openPlan(id){
+  editPlan=id||null;const p=id?S.plans.find(x=>x.id===id):null;
+  $('dpTitle').textContent=p?'Изменить план':'Новый план';$('dpSave').textContent=p?'Сохранить':'Создать';
+  $('pTitle').value=p?p.title:'';$('pGoal').value=p?p.goal||'':'';$('pStart').value=p?p.start||'':today();$('pEnd').value=p?p.end||'':'';
+  $('dlgPlan').showModal();$('pTitle').focus();
+}
+function savePlan(){
+  const title=$('pTitle').value.trim();if(!title)return;
+  const o={title,goal:$('pGoal').value.trim(),start:$('pStart').value,end:$('pEnd').value};
+  if(editPlan)Object.assign(S.plans.find(p=>p.id===editPlan),o);else S.plans.push({id:uid(),steps:[],created:Date.now(),...o});
+  save();$('dlgPlan').close();render();toast(editPlan?'План обновлён':'План создан');
+}
+function delPlan(id){if(!confirm('Удалить план вместе со всеми шагами?'))return;S.plans=S.plans.filter(p=>p.id!==id);save();render()}
+function addStep(pid){
+  const i=$('ns-'+pid),v=i.value.trim();if(!v)return;
+  S.plans.find(p=>p.id===pid).steps.push({id:uid(),text:v,done:false});save();render();$('ns-'+pid).focus();
+}
+function toggleStep(pid,sid){const s=S.plans.find(p=>p.id===pid).steps.find(x=>x.id===sid);s.done=!s.done;save();render()}
+function delStep(pid,sid){const p=S.plans.find(p=>p.id===pid);p.steps=p.steps.filter(x=>x.id!==sid);save();render()}
+function stepToTask(pid,sid){
+  const s=S.plans.find(p=>p.id===pid).steps.find(x=>x.id===sid);
+  S.tasks.push({id:uid(),title:s.text,date:today(),time:'',prio:2,note:'',done:false,created:Date.now()});save();render();toast('Добавлено в задачи на сегодня');
+}
+function viewPlans(){
+  if(!S.plans.length)return `<section class="card empty">${ic('plans')}<b>Планов пока нет</b><p>План — это цель с шагами. Например, «Запуск сайта»: разбейте на этапы и отмечайте по мере готовности.</p><button class="btn pri" onclick="openPlan()">${ic('plus')}Создать план</button></section>`;
+  return `<div class="plans">${S.plans.map(p=>{const pc=planPct(p);return `<section class="card plan">
+    <div class="ph"><h3>${esc(p.title)}</h3><div style="display:flex"><button class="ib" title="Изменить" onclick="openPlan('${p.id}')">${ic('edit')}</button><button class="ib" title="Удалить" onclick="delPlan('${p.id}')">${ic('trash')}</button></div></div>
+    <div style="margin:6px 0 2px;display:flex;gap:6px;flex-wrap:wrap">${planPeriod(p)?`<span class="chip">${esc(planPeriod(p))}</span>`:''}${pc===100&&p.steps.length?'<span class="chip ok">Готово</span>':''}</div>
+    ${p.goal?`<p class="muted small" style="margin:8px 0 0;white-space:pre-wrap">${esc(p.goal)}</p>`:''}
+    <div class="row" style="align-items:center;gap:10px;margin:12px 0 6px"><div class="pbar" style="flex:1;margin:0"><i style="width:${pc}%"></i></div><b class="small">${pc}%</b></div>
+    ${p.steps.map(s=>`<div class="step ${s.done?'done':''}"><button class="chk" aria-label="Отметить шаг" onclick="toggleStep('${p.id}','${s.id}')">${ic('chk')}</button><span>${esc(s.text)}</span>
+      <button class="ib" title="Добавить в задачи на сегодня" onclick="stepToTask('${p.id}','${s.id}')">${ic('plus')}</button><button class="ib" title="Удалить шаг" onclick="delStep('${p.id}','${s.id}')">${ic('trash')}</button></div>`).join('')}
+    <div class="addStep"><input type="text" id="ns-${p.id}" placeholder="Новый шаг" onkeydown="if(event.key==='Enter')addStep('${p.id}')" aria-label="Новый шаг"><button class="btn" onclick="addStep('${p.id}')">Добавить</button></div>
+  </section>`}).join('')}</div>`;
+}
+
+/* ======================= данные ======================= */
+function viewData(){
+  const d=S.tasks.filter(t=>t.done).length;
+  return `<div class="stack" style="max-width:640px">
+   <section class="card"><h2>Хранение</h2>
+     <p class="muted" style="margin:0 0 6px">Сейчас: задач — ${S.tasks.length} (выполнено ${d}), планов — ${S.plans.length}.</p>
+     <p class="muted small" style="margin:0">Данные сохраняются автоматически в этом браузере на этом устройстве. В другом браузере или на телефоне они не появятся, пока вы не загрузите копию.</p></section>
+   <section class="card"><h2>Резервная копия</h2>
+     <div class="row"><button class="btn pri" onclick="backup()">${ic('dl')}Сохранить копию</button>
+     <label class="btn" style="cursor:pointer">Загрузить копию<input type="file" accept=".json" class="hide" onchange="restore(this)"></label></div>
+     <p class="muted small" style="margin:10px 0 0">При загрузке задачи и планы из файла добавляются к текущим, ничего не удаляется.</p></section>
+   <section class="card"><h2>Отчёт</h2><button class="btn" onclick="dlgExport.showModal()">${ic('dl')}Скачать PDF</button></section>
+   <section class="card"><h2>Уборка</h2><button class="btn danger" onclick="clearDone()">${ic('trash')}Удалить все выполненные задачи</button></section></div>`;
+}
+function backup(){
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(S,null,2)],{type:'application/json'}));
+  a.download='planner-backup-'+today()+'.json';a.click();URL.revokeObjectURL(a.href);
+}
+function restore(inp){
+  const f=inp.files[0];if(!f)return;const r=new FileReader();
+  r.onload=()=>{try{
+    const o=JSON.parse(r.result);if(!Array.isArray(o.tasks)||!Array.isArray(o.plans))throw 0;
+    const ids=new Set(S.tasks.map(t=>t.id)),pids=new Set(S.plans.map(p=>p.id));
+    const nt=o.tasks.filter(t=>!ids.has(t.id)),np=o.plans.filter(p=>!pids.has(p.id));
+    S.tasks.push(...nt);S.plans.push(...np);save();render();toast(`Добавлено: задач ${nt.length}, планов ${np.length}`);
+  }catch(e){toast('Не удалось прочитать файл копии')}};
+  r.readAsText(f);inp.value='';
+}
+function clearDone(){if(!confirm('Удалить все выполненные задачи?'))return;S.tasks=S.tasks.filter(t=>!t.done);save();render()}
+
+/* ======================= PDF ======================= */
+function doExport(){
+  const what=$('exWhat').value,per=$('exPeriod').value,incDone=$('exDone').checked;
+  let from='0000-00-00',to='9999-99-99',label='все задачи';
+  if(per==='day'){from=to=selDate;label=fmtLong(selDate)}
+  if(per==='week'){from=weekStart(selDate);to=addDays(from,6);label=fmt(from)+' — '+fmt(to)}
+  if(per==='month'){const d=parse(selDate);from=iso(new Date(d.getFullYear(),d.getMonth(),1));to=iso(new Date(d.getFullYear(),d.getMonth()+1,0));label=MONN[d.getMonth()]+' '+d.getFullYear()}
+  let h=`<h1>${what==='plans'?'Планы':what==='tasks'?'Список задач':'Задачи и планы'}</h1><div class="pm">Сформировано ${esc(fmt(today()))}${what!=='plans'?' · период задач: '+esc(label):''}</div>`;
+  if(what!=='plans'){
+    const list=S.tasks.filter(t=>t.date>=from&&t.date<=to&&(incDone||!t.done)).sort((a,b)=>a.date.localeCompare(b.date)||sortT(a,b));
+    h+='<h2>Задачи</h2>';if(!list.length)h+='<p>За выбранный период задач нет.</p>';
+    const by={};list.forEach(t=>(by[t.date]=by[t.date]||[]).push(t));
+    Object.keys(by).forEach(d=>{h+=`<h4>${esc(fmtLong(d))}</h4><table>`+by[d].map(t=>`<tr><td class="c">${t.done?'☑':'☐'}</td><td class="tm">${esc(t.time||'')}</td><td class="${t.done?'dn':''}">${esc(t.title)}${t.note?`<br><small style="color:#666">${esc(t.note)}</small>`:''}</td><td class="pr">${PR[t.prio]}</td></tr>`).join('')+'</table>'});
+  }
+  if(what!=='tasks'){
+    h+='<h2>Планы</h2>';if(!S.plans.length)h+='<p>Планов нет.</p>';
+    S.plans.forEach(p=>{h+=`<div class="plan"><h4>${esc(p.title)} — ${planPct(p)}%</h4>`;
+      if(planPeriod(p))h+=`<div style="color:#555;font-size:11px;margin-bottom:3px">${esc(planPeriod(p))}</div>`;
+      if(p.goal)h+=`<div style="margin-bottom:4px;white-space:pre-wrap">${esc(p.goal)}</div>`;
+      if(p.steps.length)h+='<table>'+p.steps.map(s=>`<tr><td class="c">${s.done?'☑':'☐'}</td><td class="${s.done?'dn':''}">${esc(s.text)}</td></tr>`).join('')+'</table>';
+      h+='</div>'});
+  }
+  $('printRoot').innerHTML=h;$('dlgExport').close();
+  const pt=document.title;document.title='Планировщик '+today();
+  setTimeout(()=>{window.print();document.title=pt},80);
+}
+
+
+/* ======================= Телеграм-бот ======================= */
+const TGKEY='planner_tg_v1';
+const TG0={token:'',bot:'',chat:null,chatName:'',code:'',offset:0,digest:true,digestTime:'09:00',remind:true,lastDigest:'',sent:{}};
+let TG={...TG0},tgStatus='off',tgAbort=null,tgRun=0;
+const TGS={off:'Не подключён',wait:'Бот работает в другой вкладке планировщика',pair:'Ждёт код привязки',on:'Работает',
+  offline:'Нет связи с Telegram, пробую снова',conflict:'Этот бот уже запущен где-то ещё (другой браузер или сервер)',badtoken:'Токен больше не подходит — подключите бота заново'};
+function tgLoad(){try{TG={...TG0,...JSON.parse(localStorage.getItem(TGKEY)||'{}')}}catch(e){}}
+function tgSave(){try{localStorage.setItem(TGKEY,JSON.stringify(TG))}catch(e){}}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+function softRender(){const a=document.activeElement;if(a&&$('view').contains(a)&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)){renderNav();return}render()}
+function setTg(s){if(s===tgStatus)return;tgStatus=s;if(view==='bot')softRender();else renderNav()}
+
+async function tg(method,params={},signal){
+  const b=new URLSearchParams();
+  for(const k in params){const v=params[k];if(v!==undefined&&v!==null)b.append(k,typeof v==='object'?JSON.stringify(v):v)}
+  const r=await fetch('https://api.telegram.org/bot'+TG.token+'/'+method,{method:'POST',body:b,signal});
+  const j=await r.json();
+  if(!j.ok){const e=new Error(j.description||'Ошибка Telegram');e.code=j.error_code;throw e}
+  return j.result;
+}
+const tgSend=(text,kb)=>tg('sendMessage',{chat_id:TG.chat,text,parse_mode:'HTML',disable_web_page_preview:true,reply_markup:kb?{inline_keyboard:kb}:undefined});
+const cut=(s,n)=>s.length>n?s.slice(0,n-1)+'…':s;
+
+async function tgLoop(){
+  const run=++tgRun;
+  if(!TG.token){setTg('off');return}
+  const body=async()=>{
+    tgLoad();let wait=1000;
+    while(run===tgRun&&TG.token){
+      try{
+        tgAbort=new AbortController();
+        const ups=await tg('getUpdates',{offset:TG.offset,timeout:25,allowed_updates:['message','callback_query']},tgAbort.signal);
+        if(run!==tgRun)return;
+        setTg(TG.chat?'on':'pair');wait=1000;
+        for(const u of ups){TG.offset=u.update_id+1;tgSave();try{await tgHandle(u)}catch(e){console.warn('tg',e)}}
+      }catch(e){
+        if(run!==tgRun)return;
+        if(e.code===401){setTg('badtoken');return}
+        setTg(e.code===409?'conflict':'offline');
+        await sleep(wait);wait=Math.min(wait*2,30000);
+      }
+    }
+  };
+  if(navigator.locks){setTg('wait');await navigator.locks.request('planner_tg_poll',body)}else await body();
+}
+
+const TG_HELP=`Напишите мне задачу — добавлю её в планировщик на сегодня.
+
+<b>Примеры</b>
+• Позвонить поставщику
+• завтра 14:30 Созвон с командой
+• 20.11 Сдать отчёт
+• ! Подписать акт — с высокой важностью
+Вторая строка сообщения станет заметкой.
+
+<b>Команды</b>
+/today — задачи на сегодня
+/tomorrow — на завтра
+/week — ближайшие 7 дней
+/overdue — просроченные
+/plans — планы
+/done — выполнено сегодня`;
+
+function tgParse(text){
+  const lines=text.split('\n');let s=lines[0].trim(),date=today(),time='',prio=2,m;
+  if(/^!+/.test(s)){prio=1;s=s.replace(/^!+\s*/,'')}
+  if(m=s.match(/^(сегодня|завтра|послезавтра)[\s,:]+/i)){date=addDays(today(),{'сегодня':0,'завтра':1,'послезавтра':2}[m[1].toLowerCase()]);s=s.slice(m[0].length)}
+  else if(m=s.match(/^(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?[\s,:]+/)){
+    const dd=+m[1],mm=+m[2];let y=m[3]?+m[3]:new Date().getFullYear();
+    let d=new Date(y,mm-1,dd);
+    if(d.getMonth()===mm-1&&d.getDate()===dd){
+      if(!m[3]&&iso(d)<today())d=new Date(y+1,mm-1,dd);
+      date=iso(d);s=s.slice(m[0].length);
+    }
+  }
+  if(m=s.match(/^(?:в\s+)?([01]?\d|2[0-3]):([0-5]\d)[\s,]+/i)){time=m[1].padStart(2,'0')+':'+m[2];s=s.slice(m[0].length)}
+  if(/^!+/.test(s)){prio=1;s=s.replace(/^!+\s*/,'')}
+  return{title:s.trim(),date,time,prio,note:lines.slice(1).join(' ').trim()};
+}
+const tgTaskKb=t=>t.done?[[{text:'↩ Вернуть в работу',callback_data:'t|'+t.id+'|u'}]]
+  :[[{text:'✓ Выполнено',callback_data:'t|'+t.id+'|d'},{text:'→ На завтра',callback_data:'t|'+t.id+'|m'}],[{text:'Удалить',callback_data:'t|'+t.id+'|x'}]];
+const tgWhen=t=>fmt(t.date)+(t.time?', '+t.time:'');
+
+function tgList(key){
+  const t=today(),od=key==='od';
+  const list=od?S.tasks.filter(x=>!x.done&&x.date<t).sort((a,b)=>a.date.localeCompare(b.date)):dayTasks(key).sort(sortT);
+  const head=od?'Просроченные':(key===t?'Сегодня, '+fmt(key):key===addDays(t,1)?'Завтра, '+fmt(key):fmtLong(key));
+  if(!list.length)return{text:`<b>${esc(head)}</b>\n\n${od?'Просроченных задач нет.':'Задач нет. Напишите мне текст — добавлю задачу.'}`,kb:null};
+  const lines=list.map(x=>x.done?'✅ <s>'+esc(x.title)+'</s>':'▫️ '+(x.time?x.time+' ':'')+esc(x.title)+(x.prio===1?' ❗':'')+(od?' <i>('+esc(fmt(x.date))+')</i>':''));
+  const open=list.filter(x=>!x.done);
+  let text=`<b>${esc(head)}</b>\n\n${lines.join('\n')}`;
+  if(!od)text+=`\n\nВыполнено ${list.length-open.length} из ${list.length}`;
+  if(open.length)text+='\nНажмите на задачу, чтобы отметить её выполненной.';
+  return{text,kb:open.length?open.slice(0,20).map(x=>[{text:'✓ '+cut(x.title,38),callback_data:'l|'+key+'|'+x.id}]):null};
+}
+async function tgSendList(key){const l=tgList(key);await tgSend(l.text,l.kb)}
+
+async function tgHandle(u){
+  if(u.callback_query)return tgCallback(u.callback_query);
+  const m=u.message;if(!m||!m.text)return;
+  const chat=m.chat.id,text=m.text.trim();
+  if(!TG.chat){
+    if(m.chat.type==='private'&&text.replace(/^\/start\s*/,'')===TG.code){
+      TG.chat=chat;TG.chatName=[m.from.first_name,m.from.last_name].filter(Boolean).join(' ');tgSave();setTg('on');
+      toast('Телеграм-бот привязан');
+      await tgSend('Готово, бот привязан к вашему планировщику.\n\n'+TG_HELP);
+    }else await tg('sendMessage',{chat_id:chat,text:'Бот ещё не привязан. Откройте планировщик, раздел «Бот», и отправьте сюда код привязки.'});
+    return;
+  }
+  if(chat!==TG.chat){await tg('sendMessage',{chat_id:chat,text:'Это личный бот, он отвечает только владельцу.'});return}
+  const cmd=text.split(/\s+/)[0].toLowerCase().replace(/@.*$/,''),t=today();
+  if(cmd==='/start'||cmd==='/help')return tgSend(TG_HELP);
+  if(cmd==='/today'||/^сегодня$/i.test(text))return tgSendList(t);
+  if(cmd==='/tomorrow'||/^завтра$/i.test(text))return tgSendList(addDays(t,1));
+  if(cmd==='/overdue')return tgSendList('od');
+  if(cmd==='/week'){
+    const out=[];for(let i=0;i<7;i++){const d=addDays(t,i),l=dayTasks(d).filter(x=>!x.done).sort(sortT);
+      if(l.length)out.push(`<b>${esc(fmtLong(d))}</b>\n`+l.map(x=>'▫️ '+(x.time?x.time+' ':'')+esc(x.title)+(x.prio===1?' ❗':'')).join('\n'))}
+    return tgSend(out.length?out.join('\n\n'):'На ближайшие 7 дней открытых задач нет.');
+  }
+  if(cmd==='/plans'){
+    return tgSend(S.plans.length?S.plans.map(p=>`<b>${esc(p.title)}</b> — ${planPct(p)}%\n`+p.steps.map(s=>(s.done?'✅ ':'▫️ ')+esc(s.text)).join('\n')).join('\n\n'):'Планов пока нет. Их можно создать в планировщике.');
+  }
+  if(cmd==='/done'){
+    const l=S.tasks.filter(x=>x.done&&(x.doneAt||x.date)===t);
+    return tgSend(l.length?'<b>Выполнено сегодня</b>\n\n'+l.map(x=>'✅ '+esc(x.title)).join('\n'):'Сегодня пока ничего не выполнено.');
+  }
+  if(cmd.startsWith('/'))return tgSend('Не знаю такой команды. Отправьте /help — покажу, что я умею.');
+  const p=tgParse(text);
+  if(!p.title)return tgSend('Не вижу текста задачи. Пример: «завтра 14:30 Созвон с командой».');
+  const task={id:uid(),done:false,created:Date.now(),...p};
+  S.tasks.push(task);save();softRender();toast('Новая задача из Telegram');
+  return tgSend(`Добавлено на ${esc(tgWhen(task))}:\n<b>${esc(task.title)}</b>`+(task.note?'\n'+esc(task.note):''),tgTaskKb(task));
+}
+
+async function tgCallback(q){
+  const ack=text=>tg('answerCallbackQuery',{callback_query_id:q.id,text}).catch(()=>{});
+  if(!q.message||q.message.chat.id!==TG.chat)return ack('Недоступно');
+  const [k,a,b]=String(q.data||'').split('|'),t=today();
+  const edit=(text,kb)=>tg('editMessageText',{chat_id:TG.chat,message_id:q.message.message_id,text,parse_mode:'HTML',reply_markup:{inline_keyboard:kb||[]}}).catch(()=>{});
+  if(k==='l'){
+    const x=S.tasks.find(y=>y.id===b);
+    if(x&&!x.done){x.done=true;x.doneAt=t;save();softRender()}
+    const l=tgList(a);await edit(l.text,l.kb);return ack(x?'Выполнено':'Задача уже удалена');
+  }
+  if(k==='t'){
+    const x=S.tasks.find(y=>y.id===a);
+    if(!x){await edit('Этой задачи уже нет в планировщике.');return ack('Задача не найдена')}
+    const name=`<b>${esc(x.title)}</b>`;
+    if(b==='d'){x.done=true;x.doneAt=t;save();softRender();await edit('✅ Выполнено: '+name,tgTaskKb(x));return ack('Выполнено')}
+    if(b==='u'){x.done=false;x.doneAt=null;save();softRender();await edit(`В работе, ${esc(tgWhen(x))}:\n`+name,tgTaskKb(x));return ack('Возвращено в работу')}
+    if(b==='m'){x.prevDate=x.date;x.date=addDays(x.date<t?t:x.date,1);save();softRender();
+      await edit(`Перенесено на ${esc(fmt(x.date))}:\n`+name,[[{text:'↩ Вернуть на '+fmt(x.prevDate),callback_data:'t|'+x.id+'|b'}],[{text:'✓ Выполнено',callback_data:'t|'+x.id+'|d'}]]);return ack('Перенесено')}
+    if(b==='b'){if(x.prevDate){const d=x.date;x.date=x.prevDate;x.prevDate=d}save();softRender();await edit(`Возвращено на ${esc(tgWhen(x))}:\n`+name,tgTaskKb(x));return ack('Возвращено')}
+    if(b==='x'){S.tasks=S.tasks.filter(y=>y.id!==a);save();softRender();await edit('Удалено: '+esc(x.title));return ack('Удалено')}
+  }
+  return ack();
+}
+
+/* утренняя сводка и напоминания — отправляет только вкладка, которая ведёт бота */
+async function tgTick(){
+  if(tgStatus!=='on'||!TG.chat)return;
+  const n=new Date(),t=today(),mins=n.getHours()*60+n.getMinutes(),hm=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+  try{
+    if(TG.digest&&TG.lastDigest!==t&&hm>=TG.digestTime){
+      TG.lastDigest=t;tgSave();
+      const l=tgList(t),od=S.tasks.filter(x=>!x.done&&x.date<t).length;
+      await tgSend('Доброе утро! План на день.\n\n'+l.text+(od?`\n\nПросроченных задач: ${od}. Посмотреть: /overdue`:''),l.kb);
+    }
+    if(TG.remind){
+      for(const x of dayTasks(t)){
+        if(x.done||!x.time)continue;
+        const key=x.id+'|'+x.date+'|'+x.time,[h,m]=x.time.split(':').map(Number),diff=mins-(h*60+m);
+        if(diff<0||TG.sent[key])continue;
+        TG.sent[key]=1;tgSave();
+        if(diff<=30)await tgSend(`⏰ ${esc(x.time)} — <b>${esc(x.title)}</b>`+(x.note?'\n'+esc(x.note):''),tgTaskKb(x));
+      }
+      let ch=false;for(const k in TG.sent)if(!k.includes('|'+t+'|')){delete TG.sent[k];ch=true}
+      if(ch)tgSave();
+    }
+  }catch(e){console.warn('tg tick',e)}
+}
+
+async function tgConnect(){
+  const token=$('tgToken').value.trim();
+  if(!/^\d+:[\w-]{30,}$/.test(token)){toast('Это не похоже на токен. Он выглядит так: 123456789:AAH…');return}
+  $('tgBtn').disabled=true;TG={...TG0,token};
+  try{
+    const me=await tg('getMe');
+    await tg('deleteWebhook').catch(()=>{});
+    await tg('setMyCommands',{commands:[['today','Задачи на сегодня'],['tomorrow','Задачи на завтра'],['week','Ближайшие 7 дней'],['overdue','Просроченные'],['plans','Планы'],['done','Выполнено сегодня'],['help','Что умеет бот']].map(([command,description])=>({command,description}))}).catch(()=>{});
+    TG.bot=me.username;TG.code=String(Math.floor(1000+Math.random()*9000));TG.lastDigest=today();
+    tgSave();toast('Бот @'+me.username+' подключён');render();tgLoop();
+  }catch(e){
+    TG={...TG0};tgSave();render();
+    toast(e.code===401||e.code===404?'Токен не подходит. Скопируйте его из BotFather целиком.':'Не удалось связаться с Telegram. Проверьте интернет.');
+  }
+}
+function tgDisconnect(){
+  if(!confirm('Отключить бота от планировщика? Задачи останутся на месте.'))return;
+  tgRun++;if(tgAbort)tgAbort.abort();TG={...TG0};tgSave();tgStatus='off';render();toast('Бот отключён');
+}
+function tgSet(k,v){TG[k]=v;tgSave()}
+async function tgSendNow(){try{await tgSendList(today());toast('Список отправлен в Telegram')}catch(e){toast('Не удалось отправить. Проверьте интернет.')}}
+
+function viewBot(){
+  const how=`<section class="card"><h2>Как это работает</h2>
+    <p class="muted" style="margin:0 0 8px">Бот живёт прямо в этой странице, поэтому хостинг не нужен. Пока планировщик открыт во вкладке браузера, бот отвечает сразу.</p>
+    <p class="muted" style="margin:0">Если страница закрыта, сообщения не теряются: Telegram хранит их до 24 часов, и бот обработает всё, как только вы откроете планировщик.</p></section>`;
+  if(!TG.token)return `<div class="stack" style="max-width:640px">
+    <section class="card"><h2>Подключение за две минуты</h2>
+      <ol class="steps"><li>Откройте в Telegram <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> и отправьте ему <b>/newbot</b>.</li>
+      <li>Придумайте боту имя и адрес. Адрес должен заканчиваться на <b>bot</b>, например <i>moy_den_bot</i>.</li>
+      <li>BotFather пришлёт токен — длинную строку с двоеточием. Вставьте её сюда.</li></ol>
+      <div class="row" style="flex-wrap:nowrap"><input type="text" id="tgToken" placeholder="123456789:AAH…" autocomplete="off" aria-label="Токен бота" onkeydown="if(event.key==='Enter')tgConnect()">
+      <button class="btn pri" id="tgBtn" onclick="tgConnect()">Подключить</button></div>
+      <p class="muted small" style="margin:10px 0 0">Токен хранится только в этом браузере и не попадает в резервную копию.</p></section>${how}</div>`;
+  const st=`<div class="tgst ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"><i></i><span>${TGS[tgStatus]}</span></div>`;
+  if(!TG.chat)return `<div class="stack" style="max-width:640px">
+    <section class="card"><h2>Остался один шаг</h2>${st}
+      <p style="margin:12px 0">Бот <b>@${esc(TG.bot)}</b> подключён. Теперь покажите ему, что вы владелец: откройте бота и нажмите «Начать».</p>
+      <div class="row"><a class="btn pri" href="https://t.me/${esc(TG.bot)}?start=${TG.code}" target="_blank" rel="noopener">${ic('send')}Открыть бота в Telegram</a>
+      <button class="btn" onclick="tgDisconnect()">Отмена</button></div>
+      <p class="muted small" style="margin:12px 0 0">Если кнопка не сработала, найдите @${esc(TG.bot)} в Telegram и отправьте ему код <b style="color:var(--ink);font-size:16px">${TG.code}</b></p></section>${how}</div>`;
+  return `<div class="stack" style="max-width:640px">
+    <section class="card"><h2>@${esc(TG.bot)}</h2>${st}
+      <p class="muted" style="margin:10px 0 14px">Привязан к чату: ${esc(TG.chatName||'личный чат')}</p>
+      <div class="row"><button class="btn pri" onclick="tgSendNow()">${ic('send')}Отправить задачи на сегодня</button>
+      <a class="btn" href="https://t.me/${esc(TG.bot)}" target="_blank" rel="noopener">Открыть бота</a>
+      <button class="btn danger" onclick="tgDisconnect()">Отключить</button></div></section>
+    <section class="card"><h2>Уведомления</h2>
+      <label class="opt"><input type="checkbox" ${TG.digest?'checked':''} onchange="tgSet('digest',this.checked)"><span>Утренняя сводка с планом на день</span>
+        <input type="time" value="${TG.digestTime}" onchange="tgSet('digestTime',this.value||'09:00')" aria-label="Время сводки"></label>
+      <label class="opt"><input type="checkbox" ${TG.remind?'checked':''} onchange="tgSet('remind',this.checked)"><span>Напоминать о задачах, у которых указано время</span></label>
+      <p class="muted small" style="margin:8px 0 0">Уведомления приходят, когда планировщик открыт в браузере.</p></section>
+    <section class="card"><h2>Что писать боту</h2>
+      <div class="ex"><b>Позвонить поставщику</b><span>задача на сегодня</span></div>
+      <div class="ex"><b>завтра 14:30 Созвон с командой</b><span>на завтра, со временем</span></div>
+      <div class="ex"><b>20.11 Сдать отчёт</b><span>на конкретную дату</span></div>
+      <div class="ex"><b>! Подписать акт</b><span>высокая важность</span></div>
+      <div class="ex"><b>/today, /tomorrow, /week</b><span>списки с кнопками «выполнено»</span></div>
+      <div class="ex"><b>/overdue, /plans, /done</b><span>просроченные, планы, готовое</span></div></section>${how}</div>`;
+}
+window.addEventListener('storage',e=>{
+  if(e.key===KEY&&e.newValue){try{const o=JSON.parse(e.newValue);S.tasks=o.tasks||[];S.plans=o.plans||[]}catch(_){}softRender()}
+  if(e.key===TGKEY){tgLoad();if(!TG.token){tgRun++;if(tgAbort)tgAbort.abort();tgStatus='off'}else if(tgStatus==='off')tgLoop();softRender()}
+});
+
+/* ======================= отрисовка ======================= */
+function render(){
+  renderNav();
+  const T={day:'Мой день',plans:'Планы',done:'Выполнено',bot:'Телеграм-бот',data:'Данные'};
+  $('title').textContent=T[view];
+  const pdf=`<button class="btn" onclick="dlgExport.showModal()">${ic('dl')}PDF</button>`;
+  $('acts').innerHTML=pdf+(view==='day'?`<button class="btn pri" onclick="openTask()">${ic('plus')}Задача</button>`:view==='plans'?`<button class="btn pri" onclick="openPlan()">${ic('plus')}План</button>`:'');
+  $('view').innerHTML=view==='day'?viewDay():view==='plans'?viewPlans():view==='done'?viewDone():view==='bot'?viewBot():viewData();
+  if(view==='done')renderDoneList();
+}
+['dlgTask','dlgPlan','dlgExport','dlgMove'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target.id===id)e.target.close()}));
+load();tgLoad();save();render();tgLoop();setInterval(tgTick,30000);setTimeout(tgTick,4000);
+</script>
+</body>
+</html>
