@@ -203,6 +203,22 @@ h2 + .opt{border-top:0}
 .ex{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-top:1px solid var(--line);flex-wrap:wrap}
 h2 + .ex{border-top:0}
 .ex span{color:var(--muted);font-size:14px}
+.ag{display:flex;gap:10px;align-items:flex-start;padding:10px 0 10px 10px;border-top:1px solid var(--line);border-left:3px solid transparent;margin-left:-10px}
+.listHead + .ag{border-top:0}
+.ag .agT{width:46px;flex:none;font-weight:700;font-variant-numeric:tabular-nums;line-height:1.3;padding-top:2px}
+.ag .agT small{display:block;font-weight:500;color:var(--muted);font-size:12px}
+.ag .chk{width:22px;height:22px}
+.ag.past .tt,.ag.past .agT{color:var(--muted)}
+.ag.now{border-left-color:var(--turq);background:linear-gradient(90deg,var(--turq-soft),transparent 70%)}
+.ag .chip{margin-top:3px}
+.dchips{display:grid;grid-template-columns:repeat(7,1fr);gap:8px;margin-bottom:14px;max-width:720px}
+.dchips button{border:1px solid var(--line);background:var(--surface);border-radius:12px;padding:8px 2px;font-weight:700;color:var(--ink);display:flex;flex-direction:column;align-items:center;gap:1px}
+.dchips button small{font-weight:500;color:var(--muted);font-size:12px}
+.dchips button.today{border-color:var(--turq)}
+.dchips button.on{background:var(--lapis);border-color:var(--lapis);color:#fff}
+.dchips button.on small{color:rgba(255,255,255,.75)}
+.seg.days{grid-template-columns:repeat(7,1fr);gap:5px}
+.seg.days span{padding:9px 0}
 .hide{display:none!important}
 
 @media (max-width:900px){
@@ -314,6 +330,34 @@ h2 + .ex{border-top:0}
   </form>
 </dialog>
 
+<!-- Пункт графика -->
+<dialog id="dlgR">
+  <form onsubmit="event.preventDefault();saveR()">
+    <h2 id="drTitle">Новый пункт графика</h2>
+    <div class="fg">
+      <label class="f">Что делаю<input type="text" id="rTitle" required autocomplete="off" placeholder="Например: зарядка"></label>
+      <div class="two">
+        <label class="f">Начало<input type="time" id="rStart" required></label>
+        <label class="f">Конец (необязательно)<input type="time" id="rEnd"></label>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Дни недели
+        <div class="seg days">
+          <label><input type="checkbox" name="rday" value="1"><span>Пн</span></label><label><input type="checkbox" name="rday" value="2"><span>Вт</span></label>
+          <label><input type="checkbox" name="rday" value="3"><span>Ср</span></label><label><input type="checkbox" name="rday" value="4"><span>Чт</span></label>
+          <label><input type="checkbox" name="rday" value="5"><span>Пт</span></label><label><input type="checkbox" name="rday" value="6"><span>Сб</span></label>
+          <label><input type="checkbox" name="rday" value="7"><span>Вс</span></label>
+        </div>
+        <div class="row" style="gap:6px"><button type="button" class="btn sm" onclick="setRDays([1,2,3,4,5,6,7])">Каждый день</button><button type="button" class="btn sm" onclick="setRDays([1,2,3,4,5])">Будни</button><button type="button" class="btn sm" onclick="setRDays([6,7])">Выходные</button></div>
+      </div>
+      <label class="f">Заметка<input type="text" id="rNote" autocomplete="off"></label>
+    </div>
+    <div class="dFoot">
+      <button type="button" class="btn" onclick="dlgR.close()">Отмена</button>
+      <button type="submit" class="btn pri" id="drSave">Добавить</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- План -->
 <dialog id="dlgPlan">
   <form onsubmit="event.preventDefault();savePlan()">
@@ -339,7 +383,7 @@ h2 + .ex{border-top:0}
     <h2>Скачать PDF</h2>
     <div class="fg">
       <label class="f">Что включить
-        <select id="exWhat"><option value="both">Задачи и планы</option><option value="tasks">Только задачи</option><option value="plans">Только планы</option></select>
+        <select id="exWhat"><option value="both">Задачи и планы</option><option value="tasks">Только задачи</option><option value="plans">Только планы</option><option value="sched">График на неделю</option></select>
       </label>
       <label class="f">Период задач
         <select id="exPeriod">
@@ -367,14 +411,15 @@ h2 + .ex{border-top:0}
 const KEY='planner_v1', SEEDKEY='planner_seeded_v1';
 const SEED=[];
 const SEED_PLANS=[];
-let S={tasks:[],plans:[]},storageOK=true;
+let S={tasks:[],plans:[],routine:[],rdone:{}},storageOK=true;
 let view='day',selDate=iso(new Date()),editTask=null,editPlan=null,doneQ='',doneRange='all';
 
 function load(){
   let seeded=false;
   try{
     const raw=localStorage.getItem(KEY);
-    if(raw){const o=JSON.parse(raw);S.tasks=o.tasks||[];S.plans=o.plans||[]}
+    if(raw){const o=JSON.parse(raw);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.rdone=o.rdone||{};
+      const old=addDays(iso(new Date()),-60);for(const k in S.rdone)if(k<old)delete S.rdone[k]}
     seeded=!!localStorage.getItem(SEEDKEY);
   }catch(e){storageOK=false}
   if(!seeded){
@@ -421,6 +466,7 @@ const IC={
  undo:'<path d="M9 14L4 9l5-5M4 9h10a6 6 0 010 12h-3"/>',
  chk:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
  left:'<path d="M15 6l-6 6 6 6"/>',right:'<path d="M9 6l6 6-6 6"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
  send:'<path d="M21 4L3 11l6 2.5L11 20l3-5 4 3 3-14zM9 13.5L21 4"/>',
  inbox:'<path d="M4 13l2-8h12l2 8M4 13v6h16v-6M4 13h5l1 2h4l1-2h5"/>'
 };
@@ -436,7 +482,7 @@ function toast(m,undo){
 function go(v){view=v;render();window.scrollTo(0,0)}
 function renderNav(){
   const t=today(),open=S.tasks.filter(x=>!x.done&&x.date===t).length,od=S.tasks.filter(x=>!x.done&&x.date<t).length;
-  const items=[['day','cal','День',od?`<span class="badge red">${od}</span>`:(open?`<span class="badge">${open}</span>`:'')],['plans','plans','Планы',''],['done','done','Готово',''],['bot','send','Бот',TG.token?`<span class="dot ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"></span>`:''],['data','data','Данные','']];
+  const items=[['day','cal','День',od?`<span class="badge red">${od}</span>`:(open?`<span class="badge">${open}</span>`:'')],['sched','clock','График',''],['plans','plans','Планы',''],['done','done','Готово',''],['bot','send','Бот',TG.token?`<span class="dot ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"></span>`:''],['data','data','Данные','']];
   $('nav').innerHTML=items.map(([k,i,l,b])=>`<button class="${view===k?'on':''}" onclick="go('${k}')">${ic(i)}<span>${l}</span>${b}</button>`).join('');
 }
 
@@ -577,6 +623,7 @@ function viewDay(){
       ${od.length?`<div class="listHead" style="margin-top:18px"><h2 style="color:var(--pome)">Просроченные</h2></div>${od.sort((a,b)=>a.date.localeCompare(b.date)).map(x=>taskHTML(x,{date:true})).join('')}`:''}
     </section></div>
     <div class="stack">
+      ${dayScheduleCard()}
       <section class="card"><h2>Открытые задачи по важности</h2>
         <div class="seg3">${[1,2,3].map(k=>`<i style="width:${c[k]/tot*100}%;background:${col[k]}"></i>`).join('')}</div>
         ${[1,2,3].map(k=>`<div class="leg"><span class="pr pr${k}">${PR[k]}</span><b>${c[k]}</b></div>`).join('')}
@@ -656,12 +703,12 @@ function viewData(){
   const d=S.tasks.filter(t=>t.done).length;
   return `<div class="stack" style="max-width:640px">
    <section class="card"><h2>Хранение</h2>
-     <p class="muted" style="margin:0 0 6px">Сейчас: задач — ${S.tasks.length} (выполнено ${d}), планов — ${S.plans.length}.</p>
+     <p class="muted" style="margin:0 0 6px">Сейчас: задач — ${S.tasks.length} (выполнено ${d}), планов — ${S.plans.length}, пунктов графика — ${S.routine.length}.</p>
      <p class="muted small" style="margin:0">Данные сохраняются автоматически в этом браузере на этом устройстве. В другом браузере или на телефоне они не появятся, пока вы не загрузите копию.</p></section>
    <section class="card"><h2>Резервная копия</h2>
      <div class="row"><button class="btn pri" onclick="backup()">${ic('dl')}Сохранить копию</button>
      <label class="btn" style="cursor:pointer">Загрузить копию<input type="file" accept=".json" class="hide" onchange="restore(this)"></label></div>
-     <p class="muted small" style="margin:10px 0 0">При загрузке задачи и планы из файла добавляются к текущим, ничего не удаляется.</p></section>
+     <p class="muted small" style="margin:10px 0 0">При загрузке задачи, планы и пункты графика из файла добавляются к текущим, ничего не удаляется.</p></section>
    <section class="card"><h2>Отчёт</h2><button class="btn" onclick="dlgExport.showModal()">${ic('dl')}Скачать PDF</button></section>
    <section class="card"><h2>Уборка</h2><button class="btn danger" onclick="clearDone()">${ic('trash')}Удалить все выполненные задачи</button></section></div>`;
 }
@@ -675,7 +722,10 @@ function restore(inp){
     const o=JSON.parse(r.result);if(!Array.isArray(o.tasks)||!Array.isArray(o.plans))throw 0;
     const ids=new Set(S.tasks.map(t=>t.id)),pids=new Set(S.plans.map(p=>p.id));
     const nt=o.tasks.filter(t=>!ids.has(t.id)),np=o.plans.filter(p=>!pids.has(p.id));
-    S.tasks.push(...nt);S.plans.push(...np);save();render();toast(`Добавлено: задач ${nt.length}, планов ${np.length}`);
+    const rids=new Set(S.routine.map(r=>r.id)),nr=(o.routine||[]).filter(r=>!rids.has(r.id));
+    S.tasks.push(...nt);S.plans.push(...np);S.routine.push(...nr);
+    for(const k in (o.rdone||{}))if(!S.rdone[k])S.rdone[k]=o.rdone[k];
+    save();render();toast(`Добавлено: задач ${nt.length}, планов ${np.length}, пунктов графика ${nr.length}`);
   }catch(e){toast('Не удалось прочитать файл копии')}};
   r.readAsText(f);inp.value='';
 }
@@ -688,7 +738,19 @@ function doExport(){
   if(per==='day'){from=to=selDate;label=fmtLong(selDate)}
   if(per==='week'){from=weekStart(selDate);to=addDays(from,6);label=fmt(from)+' — '+fmt(to)}
   if(per==='month'){const d=parse(selDate);from=iso(new Date(d.getFullYear(),d.getMonth(),1));to=iso(new Date(d.getFullYear(),d.getMonth()+1,0));label=MONN[d.getMonth()]+' '+d.getFullYear()}
+  if(what==='sched'){
+    let g=`<h1>График на неделю</h1><div class="pm">Сформировано ${esc(fmt(today()))}</div>`;
+    if(!S.routine.length)g+='<p>График пока пуст.</p>';
+    ['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'].forEach((n,i)=>{
+      const l=S.routine.filter(r=>r.days.includes(i+1)).sort((a,b)=>a.start.localeCompare(b.start));if(!l.length)return;
+      g+=`<div class="plan"><h4>${n}</h4><table>`+l.map(r=>`<tr><td class="pr">${esc(r.start)}${r.end?'–'+esc(r.end):''}</td><td>${esc(r.title)}${r.note?`<br><small style="color:#666">${esc(r.note)}</small>`:''}</td></tr>`).join('')+'</table></div>';
+    });
+    return printOut(g);
+  }
   let h=`<h1>${what==='plans'?'Планы':what==='tasks'?'Список задач':'Задачи и планы'}</h1><div class="pm">Сформировано ${esc(fmt(today()))}${what!=='plans'?' · период задач: '+esc(label):''}</div>`;
+  if(what!=='plans'&&per==='day'&&agenda(selDate).length){
+    h+='<h2>График дня</h2><table>'+agenda(selDate).map(x=>`<tr><td class="c">${x.done?'☑':'☐'}</td><td class="pr">${esc(x.start)}${x.end?'–'+esc(x.end):''}</td><td class="${x.done?'dn':''}">${esc(x.title)}</td></tr>`).join('')+'</table>';
+  }
   if(what!=='plans'){
     const list=S.tasks.filter(t=>t.date>=from&&t.date<=to&&(incDone||!t.done)).sort((a,b)=>a.date.localeCompare(b.date)||sortT(a,b));
     h+='<h2>Задачи</h2>';if(!list.length)h+='<p>За выбранный период задач нет.</p>';
@@ -703,15 +765,104 @@ function doExport(){
       if(p.steps.length)h+='<table>'+p.steps.map(s=>`<tr><td class="c">${s.done?'☑':'☐'}</td><td class="${s.done?'dn':''}">${esc(s.text)}</td></tr>`).join('')+'</table>';
       h+='</div>'});
   }
+  printOut(h);
+}
+
+
+
+/* ======================= график дня ======================= */
+let schedDay=0,editR=null;
+const dow=s=>(parse(s).getDay()+6)%7+1;
+const dayRoutine=d=>S.routine.filter(r=>r.days.includes(dow(d))).sort((a,b)=>a.start.localeCompare(b.start));
+const rIsDone=(id,d)=>(S.rdone[d]||[]).includes(id);
+const nowHM=()=>{const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')};
+const plusHour=hm=>{const m=Math.min(1439,(+hm.slice(0,2))*60+(+hm.slice(3))+60);return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')};
+function daysLabel(ds){
+  const s=[...ds].sort().join('');
+  return s==='1234567'?'каждый день':s==='12345'?'по будням':s==='67'?'по выходным':[...ds].sort().map(x=>WD[x-1]).join(', ');
+}
+function toggleR(id,d){
+  const a=S.rdone[d]||(S.rdone[d]=[]),i=a.indexOf(id);
+  if(i<0)a.push(id);else a.splice(i,1);
+  if(!a.length)delete S.rdone[d];save();render();
+}
+/* общий список дня: пункты графика + задачи со временем */
+function agenda(d){
+  const items=dayRoutine(d).map(r=>({kind:'r',id:r.id,start:r.start,end:r.end||'',title:r.title,note:r.note||'',done:rIsDone(r.id,d)}))
+    .concat(dayTasks(d).filter(t=>t.time).map(t=>({kind:'t',id:t.id,start:t.time,end:'',title:t.title,note:'',done:t.done})))
+    .sort((a,b)=>a.start.localeCompare(b.start));
+  if(d===today()){
+    const hm=nowHM();
+    items.forEach((x,i)=>{
+      const nx=items.slice(i+1).find(y=>y.start>x.start),lim=x.end||(nx&&nx.start<plusHour(x.start)?nx.start:plusHour(x.start));
+      x.state=hm<x.start?'next':hm<lim?'now':'past';
+    });
+  }else items.forEach(x=>x.state=d<today()?'past':'next');
+  return items;
+}
+function agendaHTML(d){
+  return agenda(d).map(x=>`<div class="ag ${x.state} ${x.done?'done':''}">
+    <div class="agT">${esc(x.start)}${x.end?`<small>${esc(x.end)}</small>`:''}</div>
+    <button class="chk" aria-label="${x.done?'Снять отметку':'Отметить сделанным'}" onclick="${x.kind==='r'?`toggleR('${x.id}','${d}')`:`toggleTask('${x.id}')`}">${ic('chk')}</button>
+    <div class="tb"><div class="tt">${esc(x.title)}</div>${x.state==='now'&&!x.done?'<span class="chip ok">сейчас</span> ':''}${x.kind==='t'?'<span class="chip">задача</span>':''}${x.note?`<div class="tn">${esc(x.note)}</div>`:''}</div>
+  </div>`).join('');
+}
+function dayScheduleCard(){
+  const has=agenda(selDate).length;
+  return `<section class="card"><div class="listHead"><h2>График дня</h2><button class="btn sm" onclick="schedDay=dow(selDate);go('sched')">${has?'Изменить':'Настроить'}</button></div>
+    ${has?agendaHTML(selDate):'<p class="muted small" style="margin:6px 0 0">На этот день графика нет. Запишите распорядок — подъём, работа, спорт — и он будет появляться здесь каждый день.</p>'}</section>`;
+}
+function openR(id){
+  editR=id||null;const r=id?S.routine.find(x=>x.id===id):null;
+  $('drTitle').textContent=r?'Изменить пункт графика':'Новый пункт графика';$('drSave').textContent=r?'Сохранить':'Добавить';
+  $('rTitle').value=r?r.title:'';$('rStart').value=r?r.start:'';$('rEnd').value=r?r.end||'':'';$('rNote').value=r?r.note||'':'';
+  setRDays(r?r.days:[1,2,3,4,5,6,7]);
+  $('dlgR').showModal();$('rTitle').focus();
+}
+function setRDays(ds){document.querySelectorAll('input[name=rday]').forEach(c=>c.checked=ds.includes(+c.value))}
+function saveR(){
+  const title=$('rTitle').value.trim(),start=$('rStart').value,end=$('rEnd').value;
+  const days=[...document.querySelectorAll('input[name=rday]:checked')].map(c=>+c.value);
+  if(!title||!start)return;
+  if(!days.length){toast('Выберите хотя бы один день недели');return}
+  if(end&&end<=start){toast('Время окончания должно быть позже начала');return}
+  const o={title,start,end,days,note:$('rNote').value.trim()};
+  if(editR)Object.assign(S.routine.find(x=>x.id===editR),o);else S.routine.push({id:uid(),...o});
+  if(!days.includes(schedDay))schedDay=days[0];
+  save();$('dlgR').close();render();toast(editR?'Пункт графика обновлён':'Пункт добавлен в график');
+}
+function delR(id){
+  const i=S.routine.findIndex(x=>x.id===id),r=S.routine[i];
+  S.routine.splice(i,1);save();render();
+  toast('Пункт удалён из графика',()=>S.routine.splice(Math.min(i,S.routine.length),0,r));
+}
+function viewSched(){
+  if(!schedDay)schedDay=dow(today());
+  const td=dow(today());
+  const chips=`<div class="dchips">${WD.map((w,i)=>{const n=S.routine.filter(r=>r.days.includes(i+1)).length;
+    return `<button class="${schedDay===i+1?'on':''} ${td===i+1?'today':''}" onclick="schedDay=${i+1};render()">${w}<small>${n||'·'}</small></button>`}).join('')}</div>`;
+  if(!S.routine.length)return chips+`<section class="card empty">${ic('clock')}<b>График пока пуст</b><p>Запишите свой обычный день: во сколько подъём, работа, обед, спорт. Пункты повторяются по выбранным дням недели.</p><button class="btn pri" onclick="openR()">${ic('plus')}Добавить первый пункт</button></section>`;
+  const list=S.routine.filter(r=>r.days.includes(schedDay)).sort((a,b)=>a.start.localeCompare(b.start));
+  return chips+`<section class="card" style="max-width:720px"><div class="listHead"><h2>${['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'][schedDay-1]}</h2><span class="muted small">${list.length?'пунктов: '+list.length:''}</span></div>
+    ${list.length?list.map(r=>`<div class="ag next"><div class="agT">${esc(r.start)}${r.end?`<small>${esc(r.end)}</small>`:''}</div>
+      <div class="tb"><div class="tt">${esc(r.title)}</div><div class="tm"><span>${esc(daysLabel(r.days))}</span></div>${r.note?`<div class="tn">${esc(r.note)}</div>`:''}</div>
+      <div class="ta"><button class="ib" title="Изменить" onclick="openR('${r.id}')">${ic('edit')}</button><button class="ib" title="Удалить" onclick="delR('${r.id}')">${ic('trash')}</button></div></div>`).join('')
+    :'<p class="muted" style="margin:10px 0 4px">На этот день недели пунктов нет.</p>'}</section>
+    <p class="muted small" style="max-width:720px;margin:12px 4px 0">График показывается на главном экране в карточке «График дня». Если подключён бот, он напоминает о каждом пункте в его время и присылает график по команде /schedule.</p>`;
+}
+function tgAgenda(d){
+  const a=agenda(d);if(!a.length)return '';
+  return `<b>График на ${esc(d===today()?'сегодня':fmt(d))}</b>\n\n`+a.map(x=>(x.done?'✅ ':'🕒 ')+x.start+(x.end?'–'+x.end:'')+' '+esc(x.title)+(x.kind==='t'?' <i>(задача)</i>':'')).join('\n');
+}
+function printOut(h){
   $('printRoot').innerHTML=h;$('dlgExport').close();
   const pt=document.title;document.title='Планировщик '+today();
   setTimeout(()=>{window.print();document.title=pt},80);
 }
 
-
 /* ======================= Телеграм-бот ======================= */
 const TGKEY='planner_tg_v1';
-const TG0={token:'',bot:'',chat:null,chatName:'',code:'',offset:0,digest:true,digestTime:'09:00',remind:true,lastDigest:'',sent:{}};
+const TG0={token:'',bot:'',chat:null,chatName:'',code:'',offset:0,digest:true,digestTime:'09:00',remind:true,lastDigest:'',sent:{},cmdV:0};
 let TG={...TG0},tgStatus='off',tgAbort=null,tgRun=0;
 const TGS={off:'Не подключён',wait:'Бот работает в другой вкладке планировщика',pair:'Ждёт код привязки',on:'Работает',
   offline:'Нет связи с Telegram, пробую снова',conflict:'Этот бот уже запущен где-то ещё (другой браузер или сервер)',badtoken:'Токен больше не подходит — подключите бота заново'};
@@ -737,6 +888,7 @@ async function tgLoop(){
   if(!TG.token){setTg('off');return}
   const body=async()=>{
     tgLoad();let wait=1000;
+    if(TG.cmdV!==2)tg('setMyCommands',{commands:TG_CMDS}).then(()=>{TG.cmdV=2;tgSave()}).catch(()=>{});
     while(run===tgRun&&TG.token){
       try{
         tgAbort=new AbortController();
@@ -755,6 +907,7 @@ async function tgLoop(){
   if(navigator.locks){setTg('wait');await navigator.locks.request('planner_tg_poll',body)}else await body();
 }
 
+const TG_CMDS=[['today','Задачи на сегодня'],['schedule','График дня'],['tomorrow','Задачи на завтра'],['week','Ближайшие 7 дней'],['overdue','Просроченные'],['plans','Планы'],['done','Выполнено сегодня'],['help','Что умеет бот']].map(([command,description])=>({command,description}));
 const TG_HELP=`Напишите мне задачу — добавлю её в планировщик на сегодня.
 
 <b>Примеры</b>
@@ -770,7 +923,8 @@ const TG_HELP=`Напишите мне задачу — добавлю её в �
 /week — ближайшие 7 дней
 /overdue — просроченные
 /plans — планы
-/done — выполнено сегодня`;
+/done — выполнено сегодня
+/schedule — график дня`;
 
 function tgParse(text){
   const lines=text.split('\n');let s=lines[0].trim(),date=today(),time='',prio=2,m;
@@ -823,6 +977,7 @@ async function tgHandle(u){
   if(cmd==='/start'||cmd==='/help')return tgSend(TG_HELP);
   if(cmd==='/today'||/^сегодня$/i.test(text))return tgSendList(t);
   if(cmd==='/tomorrow'||/^завтра$/i.test(text))return tgSendList(addDays(t,1));
+  if(cmd==='/schedule'||/^график$/i.test(text))return tgSend(tgAgenda(t)||'На сегодня графика нет. Его можно настроить в планировщике, в разделе «График».');
   if(cmd==='/overdue')return tgSendList('od');
   if(cmd==='/week'){
     const out=[];for(let i=0;i<7;i++){const d=addDays(t,i),l=dayTasks(d).filter(x=>!x.done).sort(sortT);
@@ -876,7 +1031,7 @@ async function tgTick(){
     if(TG.digest&&TG.lastDigest!==t&&hm>=TG.digestTime){
       TG.lastDigest=t;tgSave();
       const l=tgList(t),od=S.tasks.filter(x=>!x.done&&x.date<t).length;
-      await tgSend('Доброе утро! План на день.\n\n'+l.text+(od?`\n\nПросроченных задач: ${od}. Посмотреть: /overdue`:''),l.kb);
+      await tgSend('Доброе утро! План на день.\n\n'+(tgAgenda(t)?tgAgenda(t)+'\n\n':'')+l.text+(od?`\n\nПросроченных задач: ${od}. Посмотреть: /overdue`:''),l.kb);
     }
     if(TG.remind){
       for(const x of dayTasks(t)){
@@ -885,6 +1040,12 @@ async function tgTick(){
         if(diff<0||TG.sent[key])continue;
         TG.sent[key]=1;tgSave();
         if(diff<=30)await tgSend(`⏰ ${esc(x.time)} — <b>${esc(x.title)}</b>`+(x.note?'\n'+esc(x.note):''),tgTaskKb(x));
+      }
+      for(const r of dayRoutine(t)){
+        const key='r:'+r.id+'|'+t+'|'+r.start,[h,m]=r.start.split(':').map(Number),diff=mins-(h*60+m);
+        if(diff<0||TG.sent[key])continue;
+        TG.sent[key]=1;tgSave();
+        if(diff<=30&&!rIsDone(r.id,t))await tgSend(`🕒 ${esc(r.start)}${r.end?'–'+esc(r.end):''} по графику: <b>${esc(r.title)}</b>`+(r.note?'\n'+esc(r.note):''));
       }
       let ch=false;for(const k in TG.sent)if(!k.includes('|'+t+'|')){delete TG.sent[k];ch=true}
       if(ch)tgSave();
@@ -899,8 +1060,8 @@ async function tgConnect(){
   try{
     const me=await tg('getMe');
     await tg('deleteWebhook').catch(()=>{});
-    await tg('setMyCommands',{commands:[['today','Задачи на сегодня'],['tomorrow','Задачи на завтра'],['week','Ближайшие 7 дней'],['overdue','Просроченные'],['plans','Планы'],['done','Выполнено сегодня'],['help','Что умеет бот']].map(([command,description])=>({command,description}))}).catch(()=>{});
-    TG.bot=me.username;TG.code=String(Math.floor(1000+Math.random()*9000));TG.lastDigest=today();
+    await tg('setMyCommands',{commands:TG_CMDS}).catch(()=>{});
+    TG.bot=me.username;TG.cmdV=2;TG.code=String(Math.floor(1000+Math.random()*9000));TG.lastDigest=today();
     tgSave();toast('Бот @'+me.username+' подключён');render();tgLoop();
   }catch(e){
     TG={...TG0};tgSave();render();
@@ -942,7 +1103,7 @@ function viewBot(){
     <section class="card"><h2>Уведомления</h2>
       <label class="opt"><input type="checkbox" ${TG.digest?'checked':''} onchange="tgSet('digest',this.checked)"><span>Утренняя сводка с планом на день</span>
         <input type="time" value="${TG.digestTime}" onchange="tgSet('digestTime',this.value||'09:00')" aria-label="Время сводки"></label>
-      <label class="opt"><input type="checkbox" ${TG.remind?'checked':''} onchange="tgSet('remind',this.checked)"><span>Напоминать о задачах, у которых указано время</span></label>
+      <label class="opt"><input type="checkbox" ${TG.remind?'checked':''} onchange="tgSet('remind',this.checked)"><span>Напоминать о задачах со временем и о пунктах графика</span></label>
       <p class="muted small" style="margin:8px 0 0">Уведомления приходят, когда планировщик открыт в браузере.</p></section>
     <section class="card"><h2>Что писать боту</h2>
       <div class="ex"><b>Позвонить поставщику</b><span>задача на сегодня</span></div>
@@ -950,24 +1111,25 @@ function viewBot(){
       <div class="ex"><b>20.11 Сдать отчёт</b><span>на конкретную дату</span></div>
       <div class="ex"><b>! Подписать акт</b><span>высокая важность</span></div>
       <div class="ex"><b>/today, /tomorrow, /week</b><span>списки с кнопками «выполнено»</span></div>
+      <div class="ex"><b>/schedule</b><span>график на сегодня</span></div>
       <div class="ex"><b>/overdue, /plans, /done</b><span>просроченные, планы, готовое</span></div></section>${how}</div>`;
 }
 window.addEventListener('storage',e=>{
-  if(e.key===KEY&&e.newValue){try{const o=JSON.parse(e.newValue);S.tasks=o.tasks||[];S.plans=o.plans||[]}catch(_){}softRender()}
+  if(e.key===KEY&&e.newValue){try{const o=JSON.parse(e.newValue);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.rdone=o.rdone||{}}catch(_){}softRender()}
   if(e.key===TGKEY){tgLoad();if(!TG.token){tgRun++;if(tgAbort)tgAbort.abort();tgStatus='off'}else if(tgStatus==='off')tgLoop();softRender()}
 });
 
 /* ======================= отрисовка ======================= */
 function render(){
   renderNav();
-  const T={day:'Мой день',plans:'Планы',done:'Выполнено',bot:'Телеграм-бот',data:'Данные'};
+  const T={day:'Мой день',sched:'График',plans:'Планы',done:'Выполнено',bot:'Телеграм-бот',data:'Данные'};
   $('title').textContent=T[view];
   const pdf=`<button class="btn" onclick="dlgExport.showModal()">${ic('dl')}PDF</button>`;
-  $('acts').innerHTML=pdf+(view==='day'?`<button class="btn pri" onclick="openTask()">${ic('plus')}Задача</button>`:view==='plans'?`<button class="btn pri" onclick="openPlan()">${ic('plus')}План</button>`:'');
-  $('view').innerHTML=view==='day'?viewDay():view==='plans'?viewPlans():view==='done'?viewDone():view==='bot'?viewBot():viewData();
+  $('acts').innerHTML=pdf+(view==='day'?`<button class="btn pri" onclick="openTask()">${ic('plus')}Задача</button>`:view==='plans'?`<button class="btn pri" onclick="openPlan()">${ic('plus')}План</button>`:view==='sched'?`<button class="btn pri" onclick="openR()">${ic('plus')}Пункт</button>`:'');
+  $('view').innerHTML=view==='day'?viewDay():view==='plans'?viewPlans():view==='sched'?viewSched():view==='done'?viewDone():view==='bot'?viewBot():viewData();
   if(view==='done')renderDoneList();
 }
-['dlgTask','dlgPlan','dlgExport','dlgMove'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target.id===id)e.target.close()}));
+['dlgTask','dlgPlan','dlgExport','dlgMove','dlgR'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target.id===id)e.target.close()}));
 load();tgLoad();save();render();tgLoop();setInterval(tgTick,30000);setTimeout(tgTick,4000);
 </script>
 </body>
