@@ -411,17 +411,18 @@ h2 + .ex{border-top:0}
 const KEY='planner_v1', SEEDKEY='planner_seeded_v1';
 const SEED=[];
 const SEED_PLANS=[];
-let S={tasks:[],plans:[],routine:[],rdone:{}},storageOK=true;
+let S={tasks:[],plans:[],routine:[],rdone:{},del:{},rdu:{}},storageOK=true;
 let view='day',selDate=iso(new Date()),editTask=null,editPlan=null,doneQ='',doneRange='all';
 
 function load(){
   let seeded=false;
   try{
     const raw=localStorage.getItem(KEY);
-    if(raw){const o=JSON.parse(raw);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.rdone=o.rdone||{};
+    if(raw){const o=JSON.parse(raw);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};
       const old=addDays(iso(new Date()),-60);for(const k in S.rdone)if(k<old)delete S.rdone[k]}
     seeded=!!localStorage.getItem(SEEDKEY);
   }catch(e){storageOK=false}
+  snap();
   if(!seeded){
     const ids=new Set(S.tasks.map(t=>t.id)),pids=new Set(S.plans.map(p=>p.id));
     SEED.forEach((t,i)=>{if(!ids.has(t.id))S.tasks.push({time:'',created:1794500000000+i,...t})});
@@ -430,12 +431,12 @@ function load(){
     try{localStorage.setItem(SEEDKEY,'1')}catch(e){}
   }
 }
-function save(){
+function persist(){
   try{localStorage.setItem(KEY,JSON.stringify(S));storageOK=true}catch(e){storageOK=false}
   $('storageWarn').classList.toggle('hide',storageOK);
-  $('sideFoot').classList.toggle('bad',!storageOK);
-  $('sideFoot').lastChild.textContent=storageOK?'Сохраняется в браузере':'Не сохраняется!';
+  footUpd();
 }
+function save(){if(stamp())syQueue();persist()}
 
 /* ======================= утилиты ======================= */
 const $=id=>document.getElementById(id);
@@ -702,9 +703,10 @@ function viewPlans(){
 function viewData(){
   const d=S.tasks.filter(t=>t.done).length;
   return `<div class="stack" style="max-width:640px">
+   ${syCard()}
    <section class="card"><h2>Хранение</h2>
      <p class="muted" style="margin:0 0 6px">Сейчас: задач — ${S.tasks.length} (выполнено ${d}), планов — ${S.plans.length}, пунктов графика — ${S.routine.length}.</p>
-     <p class="muted small" style="margin:0">Данные сохраняются автоматически в этом браузере на этом устройстве. В другом браузере или на телефоне они не появятся, пока вы не загрузите копию.</p></section>
+     <p class="muted small" style="margin:0">Данные сохраняются автоматически в этом браузере на этом устройстве. ${SY.gist?'Синхронизация включена: те же данные видны на всех подключённых устройствах.':'На другом устройстве они появятся, если включить синхронизацию выше.'}</p></section>
    <section class="card"><h2>Резервная копия</h2>
      <div class="row"><button class="btn pri" onclick="backup()">${ic('dl')}Сохранить копию</button>
      <label class="btn" style="cursor:pointer">Загрузить копию<input type="file" accept=".json" class="hide" onchange="restore(this)"></label></div>
@@ -769,6 +771,152 @@ function doExport(){
 }
 
 
+
+
+/* ======================= синхронизация между устройствами ======================= */
+const SYKEY='planner_sync_v1',SYFILE='planner-data.json',COLS=['tasks','plans','routine'];
+let SY={token:'',gist:'',last:0},syStatus='off',syEtag='',syBusy=false,syAgain=false,syPending=false,syTimer=null,SNAP={tasks:{},plans:{},routine:{},rdone:{}};
+const SYS={off:'Не подключена',sync:'Синхронизация…',ok:'Синхронизировано',offline:'Нет связи, повторю позже',badtoken:'Токен не подходит или отозван — подключите заново'};
+function stable(v){
+  if(Array.isArray(v))return '['+v.map(stable).join(',')+']';
+  if(v&&typeof v==='object')return '{'+Object.keys(v).sort().map(k=>JSON.stringify(k)+':'+stable(v[k])).join(',')+'}';
+  const s=JSON.stringify(v);return s===undefined?'null':s;
+}
+const sig=it=>{const {u,...r}=it;return stable(r)};
+function snap(){
+  SNAP={rdone:{}};COLS.forEach(c=>{SNAP[c]={};S[c].forEach(it=>SNAP[c][it.id]=sig(it))});
+  for(const d in S.rdone)SNAP.rdone[d]=stable(S.rdone[d]);
+}
+/* помечает временем всё, что изменилось с прошлого сохранения; удалённое запоминает в S.del */
+function stamp(){
+  const now=Date.now();let ch=false;
+  COLS.forEach(c=>{
+    const seen={};
+    S[c].forEach(it=>{seen[it.id]=1;const s=sig(it);if(SNAP[c][it.id]!==s){it.u=now;SNAP[c][it.id]=s;ch=true}});
+    for(const id in SNAP[c])if(!seen[id]){S.del[id]=now;delete SNAP[c][id];ch=true}
+  });
+  new Set([...Object.keys(SNAP.rdone),...Object.keys(S.rdone)]).forEach(d=>{
+    const s=S.rdone[d]?stable(S.rdone[d]):undefined;
+    if(SNAP.rdone[d]!==s){S.rdu[d]=now;ch=true;if(s===undefined)delete SNAP.rdone[d];else SNAP.rdone[d]=s}
+  });
+  return ch;
+}
+const dataOf=o=>({tasks:o.tasks||[],plans:o.plans||[],routine:o.routine||[],rdone:o.rdone||{},del:o.del||{},rdu:o.rdu||{}});
+function canon(o){
+  const d=dataOf(o),byId=(a,b)=>String(a.id).localeCompare(String(b.id)),rd={};
+  for(const k in d.rdone)rd[k]=[...d.rdone[k]].sort();
+  return stable({...d,tasks:[...d.tasks].sort(byId),plans:[...d.plans].sort(byId),routine:[...d.routine].sort(byId),rdone:rd});
+}
+function mergeData(L,R){
+  L=dataOf(L);R=dataOf(R);
+  const out={tasks:[],plans:[],routine:[],rdone:{},del:{},rdu:{}},cutT=Date.now()-90*864e5;
+  for(const id of new Set([...Object.keys(L.del),...Object.keys(R.del)])){const t=Math.max(L.del[id]||0,R.del[id]||0);if(t>cutT)out.del[id]=t}
+  COLS.forEach(c=>{
+    const rm=new Map(R[c].map(x=>[x.id,x])),seen=new Set();
+    const put=x=>{if(out.del[x.id]&&out.del[x.id]>=(x.u||0))return;out[c].push(x)};
+    L[c].forEach(x=>{seen.add(x.id);const r=rm.get(x.id);put(r&&(r.u||0)>(x.u||0)?r:x)});
+    R[c].forEach(x=>{if(!seen.has(x.id))put(x)});
+  });
+  const cutD=addDays(today(),-60);
+  for(const d of new Set([...Object.keys(L.rdone),...Object.keys(R.rdone),...Object.keys(L.rdu),...Object.keys(R.rdu)])){
+    if(d<cutD)continue;
+    const lu=L.rdu[d]||0,ru=R.rdu[d]||0;
+    const v=!lu&&!ru?[...new Set([...(L.rdone[d]||[]),...(R.rdone[d]||[])])]:(ru>lu?R:L).rdone[d];
+    if(v&&v.length)out.rdone[d]=v;
+    if(lu||ru)out.rdu[d]=Math.max(lu,ru);
+  }
+  return out;
+}
+function syLoad(){try{SY={token:'',gist:'',last:0,...JSON.parse(localStorage.getItem(SYKEY)||'{}')}}catch(e){}}
+function sySave(){try{localStorage.setItem(SYKEY,JSON.stringify(SY))}catch(e){}}
+function setSy(s){if(s===syStatus)return;syStatus=s;footUpd();const el=$('syStat');if(el){el.className='tgst '+(s==='ok'?'ok':s==='sync'?'':'bad');el.lastChild.textContent=syLabel()}}
+function syLabel(){
+  if(syStatus==='ok'&&SY.last){const d=new Date(SY.last);return 'Синхронизировано в '+String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0')}
+  return SYS[syStatus];
+}
+function footUpd(){
+  const f=$('sideFoot');f.classList.toggle('bad',!storageOK||syStatus==='badtoken');
+  f.lastChild.textContent=!storageOK?'Не сохраняется!':SY.gist?(syStatus==='badtoken'?'Синхронизация остановлена':syStatus==='offline'?'Нет связи для синхронизации':'Синхронизация включена'):'Сохраняется в браузере';
+}
+function syQueue(){if(!SY.gist)return;syPending=true;clearTimeout(syTimer);syTimer=setTimeout(syRun,1500)}
+const gh=(path,opt={})=>fetch('https://api.github.com'+path,{...opt,cache:'no-store',headers:{'Accept':'application/vnd.github+json','Authorization':'Bearer '+SY.token,...(opt.headers||{})}});
+async function syRun(){
+  if(!SY.token||!SY.gist)return;
+  if(syBusy){syAgain=true;return}
+  syBusy=true;const hadLocal=syPending;syPending=false;setSy('sync');
+  try{
+    const r=await gh('/gists/'+SY.gist,syEtag&&!hadLocal?{headers:{'If-None-Match':syEtag}}:{});
+    if(r.status===401){setSy('badtoken');return}
+    if(r.status===304){SY.last=Date.now();sySave();setSy('ok');return}
+    let remote={};
+    if(r.status===404){
+      const c=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Планировщик «Мой день» — данные (не удалять)',public:false,files:{[SYFILE]:{content:JSON.stringify(dataOf(S))}}})});
+      if(!c.ok)throw new Error('create');SY.gist=(await c.json()).id;syEtag='';
+      remote=dataOf(S);
+    }else{
+      if(!r.ok)throw new Error('http '+r.status);
+      const j=await r.json(),f=j.files&&j.files[SYFILE];
+      const txt=f?(f.truncated?await (await fetch(f.raw_url,{cache:'no-store'})).text():f.content):'';
+      try{remote=JSON.parse(txt||'{}')}catch(e){remote={}}
+      syEtag=r.headers.get('ETag')||'';
+    }
+    /* дальше до записи в S нет ожиданий, поэтому правки пользователя не теряются */
+    const merged=mergeData(S,remote),cm=canon(merged);
+    if(cm!==canon(S)){
+      S={...S,...merged};snap();persist();softRender();
+    }
+    if(cm!==canon(remote)){
+      const p=await gh('/gists/'+SY.gist,{method:'PATCH',body:JSON.stringify({files:{[SYFILE]:{content:JSON.stringify(merged)}}})});
+      if(p.status===401){setSy('badtoken');return}
+      if(!p.ok)throw new Error('patch '+p.status);
+      syEtag='';
+    }
+    SY.last=Date.now();sySave();setSy('ok');
+  }catch(e){setSy('offline')}
+  finally{syBusy=false;if(syAgain||syPending){syAgain=false;syQueue()}}
+}
+async function syConnect(){
+  const token=$('syToken').value.trim();
+  if(!/^(ghp_|github_pat_)[A-Za-z0-9_]{20,}$/.test(token)){toast('Это не похоже на токен GitHub. Он начинается с ghp_');return}
+  $('syBtn').disabled=true;SY={token,gist:'',last:0};
+  try{
+    const r=await gh('/gists?per_page=100');
+    if(r.status===401)throw {bad:1};
+    if(!r.ok)throw {};
+    const list=await r.json();let g=list.find(x=>x.files&&x.files[SYFILE]);
+    if(!g){
+      const c=await gh('/gists',{method:'POST',body:JSON.stringify({description:'Планировщик «Мой день» — данные (не удалять)',public:false,files:{[SYFILE]:{content:JSON.stringify(dataOf(S))}}})});
+      if(!c.ok)throw {scope:1};
+      g=await c.json();
+    }
+    SY.gist=g.id;sySave();syEtag='';syStatus='sync';render();footUpd();
+    toast('Синхронизация подключена');syPending=true;syRun();
+  }catch(e){
+    SY={token:'',gist:'',last:0};sySave();render();
+    toast(e.bad?'Токен не подходит. Скопируйте его с GitHub целиком.':e.scope?'У токена нет права gist. Создайте токен по ссылке из шага 1.':'Не удалось связаться с GitHub. Проверьте интернет.');
+  }
+}
+function syDisconnect(){
+  if(!confirm('Отключить синхронизацию на этом устройстве? Данные здесь останутся.'))return;
+  SY={token:'',gist:'',last:0};sySave();syStatus='off';syEtag='';render();footUpd();toast('Синхронизация отключена');
+}
+function syCard(){
+  if(!SY.gist)return `<section class="card"><h2>Синхронизация между устройствами</h2>
+    <p class="muted" style="margin:0 0 12px">Чтобы задачи, планы и график были одинаковыми на компьютере и телефоне, подключите оба устройства к одному хранилищу в вашем GitHub. Это бесплатно, данные лежат в закрытой записи вашего аккаунта.</p>
+    <ol class="steps"><li>Откройте <a href="https://github.com/settings/tokens/new?scopes=gist&description=Planner%20sync" target="_blank" rel="noopener">страницу создания токена</a>. Галочка <b>gist</b> уже стоит. В поле Expiration выберите <b>No expiration</b> и нажмите <b>Generate token</b>.</li>
+    <li>Скопируйте токен (начинается с <b>ghp_</b>) и вставьте сюда.</li>
+    <li>На втором устройстве откройте этот же сайт и вставьте тот же токен.</li></ol>
+    <div class="row" style="flex-wrap:nowrap"><input type="text" id="syToken" placeholder="ghp_…" autocomplete="off" aria-label="Токен GitHub" onkeydown="if(event.key==='Enter')syConnect()">
+    <button class="btn pri" id="syBtn" onclick="syConnect()">Подключить</button></div>
+    <p class="muted small" style="margin:10px 0 0">Токен даёт доступ только к вашим записям gist. Он хранится в этом браузере и не попадает в резервную копию.</p></section>`;
+  return `<section class="card"><h2>Синхронизация между устройствами</h2>
+    <div class="tgst ${syStatus==='ok'?'ok':syStatus==='sync'?'':'bad'}" id="syStat"><i></i><span>${syLabel()}</span></div>
+    <p class="muted" style="margin:10px 0 14px">Изменения отправляются автоматически и подтягиваются на других устройствах в течение минуты. Чтобы подключить ещё одно устройство, вставьте на нём тот же токен.</p>
+    <div class="row"><button class="btn pri" onclick="syPending=true;syRun()">Синхронизировать сейчас</button><button class="btn danger" onclick="syDisconnect()">Отключить</button></div></section>`;
+}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syRun()});
+window.addEventListener('focus',()=>syRun());
+setInterval(()=>{if(document.visibilityState==='visible')syRun()},45000);
 
 /* ======================= график дня ======================= */
 let schedDay=0,editR=null;
@@ -1086,7 +1234,8 @@ function viewBot(){
       <li>BotFather пришлёт токен — длинную строку с двоеточием. Вставьте её сюда.</li></ol>
       <div class="row" style="flex-wrap:nowrap"><input type="text" id="tgToken" placeholder="123456789:AAH…" autocomplete="off" aria-label="Токен бота" onkeydown="if(event.key==='Enter')tgConnect()">
       <button class="btn pri" id="tgBtn" onclick="tgConnect()">Подключить</button></div>
-      <p class="muted small" style="margin:10px 0 0">Токен хранится только в этом браузере и не попадает в резервную копию.</p></section>${how}</div>`;
+      <p class="muted small" style="margin:10px 0 0">Токен хранится только в этом браузере и не попадает в резервную копию.</p>
+      <p class="muted small" style="margin:6px 0 0">Подключайте бота только на одном устройстве, например на компьютере. При включённой синхронизации задачи из Telegram появятся и на остальных.</p></section>${how}</div>`;
   const st=`<div class="tgst ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"><i></i><span>${TGS[tgStatus]}</span></div>`;
   if(!TG.chat)return `<div class="stack" style="max-width:640px">
     <section class="card"><h2>Остался один шаг</h2>${st}
@@ -1115,7 +1264,8 @@ function viewBot(){
       <div class="ex"><b>/overdue, /plans, /done</b><span>просроченные, планы, готовое</span></div></section>${how}</div>`;
 }
 window.addEventListener('storage',e=>{
-  if(e.key===KEY&&e.newValue){try{const o=JSON.parse(e.newValue);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.rdone=o.rdone||{}}catch(_){}softRender()}
+  if(e.key===KEY&&e.newValue){try{const o=JSON.parse(e.newValue);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};snap()}catch(_){}softRender()}
+  if(e.key===SYKEY){syLoad();if(!SY.gist)syStatus='off';footUpd();if(view==='data')softRender()}
   if(e.key===TGKEY){tgLoad();if(!TG.token){tgRun++;if(tgAbort)tgAbort.abort();tgStatus='off'}else if(tgStatus==='off')tgLoop();softRender()}
 });
 
@@ -1130,7 +1280,7 @@ function render(){
   if(view==='done')renderDoneList();
 }
 ['dlgTask','dlgPlan','dlgExport','dlgMove','dlgR'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target.id===id)e.target.close()}));
-load();tgLoad();save();render();tgLoop();setInterval(tgTick,30000);setTimeout(tgTick,4000);
+syLoad();load();tgLoad();save();render();tgLoop();syRun();setInterval(tgTick,30000);setTimeout(tgTick,4000);
 </script>
 </body>
 </html>
