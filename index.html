@@ -898,15 +898,26 @@ function heroHTML(){
       <svg class="fcClock" width="200" height="200" viewBox="0 0 200 200" role="img" aria-label="Часы"><circle cx="100" cy="100" r="98" fill="#fff" stroke="#e3e7e3" stroke-width="2"/>${ticks}${nums}
         <line id="fcHr" x1="100" y1="100" x2="100" y2="62" stroke="#1d2420" stroke-width="5" stroke-linecap="round" transform="rotate(${hrDeg} 100 100)"/>
         <line id="fcMin" x1="100" y1="100" x2="100" y2="32" stroke="#1d2420" stroke-width="3" stroke-linecap="round" transform="rotate(${minDeg} 100 100)"/>
-        <circle cx="100" cy="100" r="5" fill="var(--acc)"/></svg>
+        <g id="fcSec" transform="rotate(${nw.getSeconds()*6+nw.getMilliseconds()*.006} 100 100)"><line x1="100" y1="118" x2="100" y2="22" stroke="#c8483c" stroke-width="1.6" stroke-linecap="round"/><circle cx="100" cy="100" r="6" fill="#c8483c"/></g>
+        <circle cx="100" cy="100" r="2.6" fill="#fff"/></svg>
       <div class="fcNow"><small>${esc(lab)}</small><b>${esc(big)}</b>${sub?`<span>${esc(sub)}</span>`:''}
         <div class="fcBar"><i style="width:${Math.round(frac*100)}%"></i></div>${foot?`<em>${esc(foot)}</em>`:''}</div>
     </div>
     ${line?`<div class="fcLine">${line}</div>`:''}
   </section>`;
 }
-setInterval(()=>{const a=document.getElementById('fcHr'),b=document.getElementById('fcMin');if(!a||!b)return;const n=new Date();
-  a.setAttribute('transform','rotate('+((n.getHours()%12)*30+n.getMinutes()/2)+' 100 100)');b.setAttribute('transform','rotate('+(n.getMinutes()*6+n.getSeconds()/10)+' 100 100)')},20000);
+(function(){
+  const rm=matchMedia('(prefers-reduced-motion: reduce)');
+  function step(){
+    const a=document.getElementById('fcHr');
+    if(a){const b=document.getElementById('fcMin'),c=document.getElementById('fcSec'),n=new Date();
+      let sec=n.getSeconds()+(rm.matches?0:n.getMilliseconds()/1000);const min=n.getMinutes()+sec/60,hr=(n.getHours()%12)+min/60;
+      a.setAttribute('transform','rotate('+(hr*30).toFixed(3)+' 100 100)');b.setAttribute('transform','rotate('+(min*6).toFixed(3)+' 100 100)');
+      if(c)c.setAttribute('transform','rotate('+(sec*6).toFixed(3)+' 100 100)');}
+    rm.matches?setTimeout(()=>requestAnimationFrame(step),1000-new Date().getMilliseconds()):requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+})();
 function weekHTML(){
   const ws=weekStart(selDate),t=today();
   const days=[...Array(7)].map((_,i)=>addDays(ws,i));
