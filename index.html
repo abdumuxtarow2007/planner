@@ -407,6 +407,30 @@ body{background:var(--ground);color:var(--ink)}
 .aBrand .bn{display:grid;line-height:1.05}.aBrand .bn b{font-size:24px;font-weight:800;letter-spacing:.1em}
 .aBrand .bn i{font-style:normal;font-size:13px;color:var(--muted);font-weight:500;margin-top:4px}
 @media (max-width:760px){.brand{display:none!important}.fcRow{flex-direction:column;gap:18px}.fcClock{width:176px;height:176px}.fcNow{width:100%;max-width:none;min-width:0;padding:16px 18px}.fcNow b{font-size:24px}.hero h2{font-size:22px}}
+
+/* ---------- свои выпадающие списки и флажки ---------- */
+.cs{position:relative;display:block}
+.tools .cs{display:inline-block;width:auto;flex:none}
+.cs>select{position:absolute!important;opacity:0;pointer-events:none;width:1px!important;height:1px!important;left:0;bottom:0;margin:0}
+.csBtn{width:100%;display:flex;align-items:center;justify-content:space-between;gap:12px;text-align:left;font:inherit;font-weight:500;color:var(--ink);background:#fff;border:1px solid #d5deea;border-radius:12px;padding:11px 12px 11px 14px;cursor:pointer;min-height:44px;transition:border-color .15s,box-shadow .15s}
+.csBtn:hover{border-color:#b9c4bd}
+.csBtn:focus-visible,.cs.open .csBtn{outline:none;border-color:var(--acc);box-shadow:0 0 0 3px rgba(63,122,95,.16)}
+.csBtn svg{flex:none;color:var(--muted);transition:transform .18s}
+.cs.open .csBtn svg{transform:rotate(180deg)}
+.csList{position:fixed;z-index:2147483000;background:#fff;border:1px solid var(--line);border-radius:16px;box-shadow:0 18px 40px -14px rgba(29,36,32,.35),0 2px 6px rgba(29,36,32,.06);padding:6px;max-height:min(320px,60vh);overflow:auto;display:none;animation:csIn .12s ease-out}
+.cs.open .csList{display:block}
+@keyframes csIn{from{opacity:0;transform:translateY(-4px)}to{opacity:1;transform:none}}
+.csList[data-up]{animation-name:csUp}
+@keyframes csUp{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.csOpt{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-radius:11px;cursor:pointer;font-weight:500;color:var(--ink);user-select:none}
+.csOpt:hover,.csOpt.hi{background:#f0f3f0}
+.csOpt.sel{background:#e8f0ec;color:#2d5c47;font-weight:700}
+.csOpt svg{flex:none;color:var(--acc);opacity:0}
+.csOpt.sel svg{opacity:1}
+.opt input[type=checkbox],#exDone{-webkit-appearance:none;appearance:none;width:22px!important;height:22px!important;flex:none;border:2px solid #c3cac5;border-radius:7px;background:#fff;display:inline-grid;place-content:center;cursor:pointer;margin:0;transition:background .15s,border-color .15s}
+.opt input[type=checkbox]:hover,#exDone:hover{border-color:var(--acc)}
+.opt input[type=checkbox]:checked,#exDone:checked{background:var(--acc) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23fff' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 12.5l4.5 4.5L19 7.5'/%3E%3C/svg%3E") center/16px no-repeat;border-color:var(--acc)}
+.opt input[type=checkbox]:focus-visible,#exDone:focus-visible{outline:none;box-shadow:0 0 0 3px rgba(63,122,95,.2)}
 </style>
 </head>
 <body>
@@ -560,7 +584,7 @@ body{background:var(--ground);color:var(--ink)}
           <option value="all">Все задачи</option>
         </select>
       </label>
-      <label style="display:flex;gap:10px;align-items:center;font-weight:600"><input type="checkbox" id="exDone" checked style="width:18px;height:18px;accent-color:#0e8c8c"> Включить выполненные</label>
+      <label style="display:flex;gap:10px;align-items:center;font-weight:600"><input type="checkbox" id="exDone" checked> Включить выполненные</label>
       <p class="muted small" style="margin:0">Откроется окно печати. В нём выберите «Сохранить как PDF».</p>
     </div>
     <div class="dFoot">
@@ -1564,6 +1588,83 @@ function render(){
 }
 ['dlgTask','dlgPlan','dlgExport','dlgMove','dlgR'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target.id===id)e.target.close()}));
 syLoad();auLoad();load();tgLoad();save();render();auGate();auMode();auFromLink();tgLoop();syRun();setInterval(tgTick,30000);setTimeout(tgTick,4000);
+
+/* ======== свои выпадающие списки ======== */
+(function(){
+  const CHEV='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+  const CHK='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>';
+  const vd=Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype,'value');
+  Object.defineProperty(HTMLSelectElement.prototype,'value',{get(){return vd.get.call(this)},set(v){vd.set.call(this,v);if(this._cs)this._cs.sync()},configurable:true});
+  let openCS=null;
+  function closeAll(){if(openCS){openCS.close()}}
+  function make(sel){
+    if(sel._cs||sel.multiple)return;
+    const w=document.createElement('div');w.className='cs';
+    sel.parentNode.insertBefore(w,sel);w.appendChild(sel);
+    const btn=document.createElement('button');btn.type='button';btn.className='csBtn';btn.setAttribute('aria-haspopup','listbox');btn.setAttribute('aria-expanded','false');
+    if(sel.getAttribute('aria-label'))btn.setAttribute('aria-label',sel.getAttribute('aria-label'));
+    const list=document.createElement('div');list.className='csList';list.setAttribute('role','listbox');
+    w.insertBefore(btn,sel);w.appendChild(list);
+    list.addEventListener('click',e=>e.preventDefault());
+    sel.tabIndex=-1;sel.addEventListener('focus',()=>btn.focus());
+    let hi=-1;
+    const api={
+      sync(){
+        const o=sel.options[sel.selectedIndex];btn.innerHTML='<span>'+(o?o.text.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c])):'')+'</span>'+CHEV;
+        [...list.children].forEach((e,i)=>e.classList.toggle('sel',i===sel.selectedIndex));
+      },
+      build(){
+        list.innerHTML='';
+        [...sel.options].forEach((o,i)=>{
+          const d=document.createElement('div');d.className='csOpt';d.setAttribute('role','option');d.dataset.i=i;
+          const t=document.createElement('span');t.textContent=o.text;d.appendChild(t);d.insertAdjacentHTML('beforeend',CHK);
+          d.addEventListener('mousedown',e=>e.preventDefault());
+          d.addEventListener('click',e=>{e.preventDefault();e.stopPropagation();api.pick(i)});
+          d.addEventListener('mousemove',()=>api.hi(i));
+          list.appendChild(d)
+        });api.sync()
+      },
+      hi(i){hi=i;[...list.children].forEach((e,k)=>e.classList.toggle('hi',k===i));const e=list.children[i];if(e)e.scrollIntoView({block:'nearest'})},
+      pick(i){
+        const ch=sel.selectedIndex!==i;sel.selectedIndex=i;api.sync();api.close();btn.focus();
+        if(ch){sel.dispatchEvent(new Event('input',{bubbles:true}));sel.dispatchEvent(new Event('change',{bubbles:true}))}
+      },
+      open(){
+        if(openCS&&openCS!==api)openCS.close();
+        api.build();w.classList.add('open');btn.setAttribute('aria-expanded','true');
+        const r=btn.getBoundingClientRect();list.style.minWidth=r.width+'px';list.style.left=r.left+'px';
+        list.style.visibility='hidden';list.style.top='0px';
+        const h=list.offsetHeight,below=innerHeight-r.bottom-8,above=r.top-8;
+        const up=h>below&&above>below;
+        list.toggleAttribute('data-up',up);
+        list.style.top=(up?Math.max(8,r.top-4-Math.min(h,above)):r.bottom+4)+'px';
+        if(up)list.style.maxHeight=Math.min(h,above)+'px';else list.style.maxHeight=Math.min(320,innerHeight*.6,below)+'px';
+        list.style.visibility='';
+        openCS=api;api.hi(sel.selectedIndex);
+      },
+      close(){w.classList.remove('open');btn.setAttribute('aria-expanded','false');if(openCS===api)openCS=null}
+    };
+    sel._cs=api;
+    btn.addEventListener('click',()=>{w.classList.contains('open')?api.close():api.open()});
+    btn.addEventListener('keydown',e=>{
+      const n=sel.options.length,open=w.classList.contains('open');
+      if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();if(!open)return api.open();api.hi(Math.min(n-1,Math.max(0,hi+(e.key==='ArrowDown'?1:-1))))}
+      else if(e.key==='Home'&&open){e.preventDefault();api.hi(0)}
+      else if(e.key==='End'&&open){e.preventDefault();api.hi(n-1)}
+      else if((e.key==='Enter'||e.key===' ')&&open){e.preventDefault();api.pick(hi<0?sel.selectedIndex:hi)}
+      else if(e.key==='Escape'&&open){e.preventDefault();e.stopPropagation();api.close()}
+      else if(e.key==='Tab'&&open)api.close();
+    });
+    api.build();
+  }
+  function scan(root){(root.querySelectorAll?root.querySelectorAll('select'):[]).forEach(make);if(root.tagName==='SELECT')make(root)}
+  document.addEventListener('mousedown',e=>{if(openCS&&!e.target.closest('.cs'))closeAll()});
+  document.addEventListener('keydown',e=>{if(e.key==='Escape'&&openCS){e.stopPropagation();closeAll()}},true);
+  addEventListener('resize',closeAll);
+  document.addEventListener('scroll',e=>{if(openCS&&!(e.target.closest&&e.target.closest('.csList')))closeAll()},true);
+  new MutationObserver(ms=>{for(const m of ms)m.addedNodes.forEach(n=>{if(n.nodeType===1)scan(n)})}).observe(document.body,{childList:true,subtree:true});
+  scan(document);
+})();
 </script>
 </body>
 </html>
