@@ -367,11 +367,15 @@ body{background:var(--ground);color:var(--ink)}
 .fcHead{margin-bottom:22px}
 .fcG{font-size:14px;color:var(--muted)}
 .hero h2{color:var(--ink);font-size:24px;font-weight:700;letter-spacing:-.01em;margin:2px 0 0}
-.fcRing{position:relative;width:244px;height:244px}
-.fcIn{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:0 52px}
-.fcIn small{font-size:13px;color:var(--muted)}
-.fcIn b{font-weight:800;letter-spacing:-.02em;line-height:1.1;max-width:100%;overflow-wrap:anywhere}
-.fcIn span{font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums;margin-top:2px}
+.fcRow{display:flex;align-items:center;justify-content:center;gap:34px;width:100%}
+.fcClock{flex:none;filter:drop-shadow(0 10px 18px rgba(29,36,32,.10))}
+.fcNow{background:#fff;border:1px solid var(--line);border-radius:22px;padding:20px 24px;text-align:left;display:grid;gap:3px;min-width:260px;max-width:360px;flex:1;box-shadow:var(--shadow)}
+.fcNow small{font-size:13px;color:var(--acc);font-weight:700}
+.fcNow b{font-size:28px;font-weight:800;letter-spacing:-.02em;line-height:1.1;overflow-wrap:anywhere}
+.fcNow span{font-size:15px;color:var(--muted);font-variant-numeric:tabular-nums}
+.fcBar{height:8px;background:#e3e7e3;border-radius:99px;margin-top:12px;overflow:hidden}
+.fcBar i{display:block;height:100%;background:var(--acc);border-radius:99px;transition:width .6s}
+.fcNow em{font-style:normal;font-size:13px;color:var(--muted);margin-top:4px}
 .fcLine{margin-top:18px;font-size:15px;color:var(--muted);max-width:520px}
 .card,.plan,.stat{border-radius:20px;border-color:var(--line);box-shadow:var(--shadow)}
 .task{border-radius:20px}
@@ -399,7 +403,7 @@ body{background:var(--ground);color:var(--ink)}
 .authCard{box-shadow:0 20px 60px -30px rgba(29,36,32,.35);border:1px solid var(--line)}
 .aBrand .bn{display:grid;line-height:1.05}.aBrand .bn b{font-size:24px;font-weight:800;letter-spacing:.1em}
 .aBrand .bn i{font-style:normal;font-size:13px;color:var(--muted);font-weight:500;margin-top:4px}
-@media (max-width:760px){.brand{display:none!important}.fcRing{width:224px;height:224px}.fcRing svg{width:224px;height:224px}.fcIn{padding:0 44px}.hero h2{font-size:22px}}
+@media (max-width:760px){.brand{display:none!important}.fcRow{flex-direction:column;gap:18px}.fcClock{width:176px;height:176px}.fcNow{width:100%;max-width:none;min-width:0;padding:16px 18px}.fcNow b{font-size:24px}.hero h2{font-size:22px}}
 </style>
 </head>
 <body>
@@ -729,38 +733,39 @@ function heroHTML(){
   const h=new Date().getHours(),greet=h<5?'Доброй ночи':h<12?'Доброе утро':h<18?'Добрый день':'Добрый вечер';
   const d=parse(selDate),ag=agenda(selDate);
   const tm=x=>{const[a,b]=x.split(':');return +a*60+ +b};
-  const R=94,C=2*Math.PI*R,nw=new Date(),minDeg=nw.getMinutes()*6+nw.getSeconds()/10,hrDeg=(nw.getHours()%12)*30+nw.getMinutes()/2;
-  let ticks='';for(let i=0;i<60;i++){const a=i*Math.PI/30,big5=i%5===0,r1=big5?107:109,r2=big5?116:113;ticks+=`<line x1="${(122+r1*Math.sin(a)).toFixed(1)}" y1="${(122-r1*Math.cos(a)).toFixed(1)}" x2="${(122+r2*Math.sin(a)).toFixed(1)}" y2="${(122-r2*Math.cos(a)).toFixed(1)}" stroke-width="${big5?2.4:1.2}" ${i%15===0?'stroke="#1d2420"':''}/>`}
-  let lab='',big='',sub='',frac=0,line='';
+  const nw=new Date(),minDeg=nw.getMinutes()*6+nw.getSeconds()/10,hrDeg=(nw.getHours()%12)*30+nw.getMinutes()/2;
+  let ticks='';for(let i=0;i<60;i++){const a=i*Math.PI/30,b5=i%5===0,r1=b5?84:88,r2=94;ticks+=`<line x1="${(100+r1*Math.sin(a)).toFixed(1)}" y1="${(100-r1*Math.cos(a)).toFixed(1)}" x2="${(100+r2*Math.sin(a)).toFixed(1)}" y2="${(100-r2*Math.cos(a)).toFixed(1)}" stroke="${b5?'#1d2420':'#c3cac5'}" stroke-width="${b5?2.2:1}" stroke-linecap="round"/>`}
+  const nums=[[12,100,60],[3,140,100],[6,100,140],[9,60,100]].map(([n,x,y])=>`<text x="${x}" y="${y}" text-anchor="middle" dominant-baseline="central" font-size="16" font-weight="700" fill="#1d2420">${n}</text>`).join('');
+  let lab='',big='',sub='',frac=0,foot='',line='';
   if(selDate===t){
     const cur=ag.find(x=>x.state==='now'&&!x.done),nxt=ag.filter(x=>x.state==='next'&&!x.done);
     if(cur){
-      const n=new Date(),m=n.getHours()*60+n.getMinutes(),st=tm(cur.start),en=cur.end?tm(cur.end):st+60;
-      frac=Math.min(1,Math.max(0,(m-st)/(en-st)));lab='Сейчас';big=cur.title;sub=cur.end?'до '+cur.end:'с '+cur.start;
-    }else{lab=total&&done===total?'Готово':'Свободно';big=total&&done===total?'Всё сделано':'Пауза';frac=total?done/total:0}
+      const m=nw.getHours()*60+nw.getMinutes(),st=tm(cur.start),en=cur.end?tm(cur.end):st+60,left=Math.max(0,en-m);
+      frac=Math.min(1,Math.max(0,(m-st)/(en-st)));lab='Сейчас';big=cur.title;sub=cur.start+(cur.end?' – '+cur.end:'');
+      foot='осталось '+(left>=60?Math.floor(left/60)+' ч '+(left%60?left%60+' мин':''):left+' мин');
+    }else{lab=total&&done===total?'Готово':'Свободно';big=total&&done===total?'Всё сделано':'Сейчас пауза';frac=total?done/total:0;sub=total?`задач выполнено: ${done} из ${total}`:''}
     const nx=nxt.filter(x=>x!==cur);
-    if(nx[0])line='Дальше '+esc(nx[0].title.toLowerCase())+' в '+nx[0].start+(nx[1]?', потом '+esc(nx[1].title.toLowerCase())+' в '+nx[1].start:'');
+    if(nx[0])line='Дальше: '+esc(nx[0].title.toLowerCase())+' в '+nx[0].start+(nx[1]?', потом '+esc(nx[1].title.toLowerCase())+' в '+nx[1].start:'');
     else if(!cur)line=total&&done===total?'Хороший день!':'На сегодня блоков больше нет';
   }else{
     frac=total?done/total:0;lab=rel||'День';big=total?done+' из '+total:'Пусто';sub=total?'задач выполнено':'ничего не запланировано';
     const f=ag.filter(x=>!x.done)[0];if(f)line='Первое: '+esc(f.title.toLowerCase())+' в '+f.start;
   }
-  const bigSize=big.length>8?(big.length>13?18:22):30;
   return `<section class="hero">
     <div class="fcHead"><div class="fcG">${selDate===t?greet:(rel||'&nbsp;')}</div><h2>${WDF[d.getDay()].toLowerCase()}, ${d.getDate()} ${MON[d.getMonth()]}</h2></div>
-    <div class="fcRing" role="img" aria-label="${esc(lab)} ${esc(big)}">
-      <svg width="244" height="244" viewBox="0 0 244 244"><g stroke="#c3cac5" stroke-linecap="round">${ticks}</g>
-      <circle cx="122" cy="122" r="${R}" fill="none" stroke="#e3e7e3" stroke-width="6"/>
-      <circle cx="122" cy="122" r="${R}" fill="none" stroke="var(--acc)" stroke-width="6" stroke-linecap="round" stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${(C*(1-frac)).toFixed(1)}" transform="rotate(-90 122 122)" style="transition:stroke-dashoffset .6s"/>
-      <line id="fcHr" x1="122" y1="${122-78}" x2="122" y2="${122-92}" stroke="#1d2420" stroke-width="5" stroke-linecap="round" transform="rotate(${hrDeg} 122 122)"/>
-      <line id="fcMin" x1="122" y1="${122-72}" x2="122" y2="${122-92}" stroke="#1d2420" stroke-width="2.5" stroke-linecap="round" transform="rotate(${minDeg} 122 122)"/></svg>
-      <div class="fcIn"><small>${esc(lab)}</small><b style="font-size:${bigSize}px">${esc(big)}</b>${sub?`<span>${esc(sub)}</span>`:''}</div>
+    <div class="fcRow">
+      <svg class="fcClock" width="200" height="200" viewBox="0 0 200 200" role="img" aria-label="Часы"><circle cx="100" cy="100" r="98" fill="#fff" stroke="#e3e7e3" stroke-width="2"/>${ticks}${nums}
+        <line id="fcHr" x1="100" y1="100" x2="100" y2="62" stroke="#1d2420" stroke-width="5" stroke-linecap="round" transform="rotate(${hrDeg} 100 100)"/>
+        <line id="fcMin" x1="100" y1="100" x2="100" y2="32" stroke="#1d2420" stroke-width="3" stroke-linecap="round" transform="rotate(${minDeg} 100 100)"/>
+        <circle cx="100" cy="100" r="5" fill="var(--acc)"/></svg>
+      <div class="fcNow"><small>${esc(lab)}</small><b>${esc(big)}</b>${sub?`<span>${esc(sub)}</span>`:''}
+        <div class="fcBar"><i style="width:${Math.round(frac*100)}%"></i></div>${foot?`<em>${esc(foot)}</em>`:''}</div>
     </div>
     ${line?`<div class="fcLine">${line}</div>`:''}
   </section>`;
 }
 setInterval(()=>{const a=document.getElementById('fcHr'),b=document.getElementById('fcMin');if(!a||!b)return;const n=new Date();
-  a.setAttribute('transform','rotate('+((n.getHours()%12)*30+n.getMinutes()/2)+' 122 122)');b.setAttribute('transform','rotate('+(n.getMinutes()*6+n.getSeconds()/10)+' 122 122)')},20000);
+  a.setAttribute('transform','rotate('+((n.getHours()%12)*30+n.getMinutes()/2)+' 100 100)');b.setAttribute('transform','rotate('+(n.getMinutes()*6+n.getSeconds()/10)+' 100 100)')},20000);
 function weekHTML(){
   const ws=weekStart(selDate),t=today();
   const days=[...Array(7)].map((_,i)=>addDays(ws,i));
