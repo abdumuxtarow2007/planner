@@ -483,6 +483,35 @@ body{background:var(--ground);color:var(--ink)}
 .tpSep{align-self:center;font-weight:800;color:var(--muted)}
 .tpLab{display:flex;justify-content:space-around;font-size:12px;font-weight:600;color:var(--muted);padding:2px 0 6px}
 @media (max-width:760px){.dpPop{width:min(296px,calc(100vw - 24px))}}
+
+/* ---------- расходы ---------- */
+.xWrap{max-width:980px}
+.xDay{display:flex;align-items:center;gap:10px;padding:12px 14px}
+.xDayT{flex:1;display:grid;text-align:center}.xDayT small{color:var(--muted);font-size:13px}.xDayT b{font-size:19px;font-weight:800}
+.xForm{display:grid;gap:14px}
+.xAmt{display:flex;align-items:baseline;gap:10px;border-bottom:2px solid var(--line);padding-bottom:6px;transition:border-color .15s}
+.xAmt:focus-within{border-color:var(--acc)}
+.xAmt input{border:0!important;background:none!important;box-shadow:none!important;outline:none;padding:0!important;font:800 40px/1.1 var(--sans)!important;letter-spacing:-.02em;color:var(--ink);min-width:0;flex:1;font-variant-numeric:tabular-nums}
+.xAmt input::placeholder{color:#c3cac5}
+.xAmt span{font-weight:700;color:var(--muted);font-size:18px}
+.xChips{display:flex;flex-wrap:wrap;gap:8px}
+.xChip{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;border-radius:99px;padding:8px 13px;font:inherit;font-size:14px;font-weight:600;color:var(--ink);cursor:pointer;transition:background .12s,border-color .12s}
+.xChip i{width:9px;height:9px;border-radius:50%;background:var(--c)}
+.xChip:hover{border-color:#b9c4bd}
+.xChip.on{background:#1d2420;border-color:#1d2420;color:#fff}
+.xRow{display:flex;gap:10px}.xRow input{flex:1;min-width:0}
+.xList{display:grid;gap:2px;margin:0 -8px}
+.xItem{display:flex;align-items:center;gap:12px;padding:10px 8px;border:0;background:none;border-radius:12px;font:inherit;text-align:left;cursor:pointer;color:var(--ink);width:100%}
+.xItem:hover{background:#f0f3f0}
+.xItem>i{width:10px;height:10px;border-radius:50%;flex:none}
+.xInfo{flex:1;display:grid;min-width:0}.xInfo b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.xInfo small{color:var(--muted);font-size:13px}
+.xSum{font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.xCats{display:grid;gap:12px}
+.xCatT{display:flex;justify-content:space-between;gap:10px;font-size:14px;margin-bottom:5px}
+.xCatT span{display:flex;align-items:center;gap:8px}.xCatT i{width:9px;height:9px;border-radius:50%}
+.xCatT b{font-variant-numeric:tabular-nums}
+.xBar{height:8px;background:#eef1ee;border-radius:99px;overflow:hidden}.xBar i{display:block;height:100%;border-radius:99px}
+@media (max-width:760px){.xWrap .stats3{grid-template-columns:repeat(3,1fr);gap:8px}.xWrap .stat{padding:12px}.xWrap .stat b{font-size:19px}.xWrap .stat span{font-size:12px}.xAmt input{font-size:34px!important}.xRow{flex-direction:column}.xRow .btn{width:100%;justify-content:center}.nav button{font-size:10px}.nav button span{white-space:nowrap}}
 </style>
 </head>
 <body>
@@ -634,6 +663,24 @@ body{background:var(--ground);color:var(--ink)}
   </div>
 </dialog>
 
+<!-- Расход -->
+<dialog id="dlgExp">
+  <form onsubmit="event.preventDefault();saveExpDlg()">
+    <h2>Изменить расход</h2>
+    <div class="fg">
+      <label class="f">Сумма, сум<input type="text" id="xeAmt" inputmode="numeric" autocomplete="off" required oninput="expFmtIn(this)"></label>
+      <label class="f">Категория<select id="xeCat"></select></label>
+      <div class="two"><label class="f">Дата<input type="date" id="xeDate" required></label><label class="f">Время<input type="time" id="xeTime"></label></div>
+      <label class="f">На что<input type="text" id="xeNote" maxlength="120" autocomplete="off"></label>
+    </div>
+    <div class="dFoot">
+      <button type="button" class="btn danger" style="margin-right:auto" onclick="delExp(editExp,true)">Удалить</button>
+      <button type="button" class="btn" onclick="dlgExp.close()">Отмена</button>
+      <button type="submit" class="btn pri">Сохранить</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- PDF -->
 <dialog id="dlgExport">
   <form onsubmit="event.preventDefault();doExport()">
@@ -668,14 +715,14 @@ body{background:var(--ground);color:var(--ink)}
 const KEY='planner_v1', SEEDKEY='planner_seeded_v1';
 const SEED=[];
 const SEED_PLANS=[];
-let S={tasks:[],plans:[],routine:[],rdone:{},del:{},rdu:{}},storageOK=true;
-let view='day',selDate=iso(new Date()),editTask=null,editPlan=null,doneQ='',doneRange='all';
+let S={tasks:[],plans:[],routine:[],exp:[],rdone:{},del:{},rdu:{}},storageOK=true;
+let expDate=iso(new Date()),expCat='food',view='day',selDate=iso(new Date()),editTask=null,editPlan=null,doneQ='',doneRange='all';
 
 function load(){
   let seeded=false;
   try{
     const raw=localStorage.getItem(KEY);
-    if(raw){const o=JSON.parse(raw);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};
+    if(raw){const o=JSON.parse(raw);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.exp=o.exp||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};
       const old=addDays(iso(new Date()),-60);for(const k in S.rdone)if(k<old)delete S.rdone[k]}
     seeded=!!localStorage.getItem(SEEDKEY);
   }catch(e){storageOK=false}
@@ -725,6 +772,7 @@ const IC={
  chk:'<path d="M5 12.5l4.5 4.5L19 7.5"/>',
  left:'<path d="M15 6l-6 6 6 6"/>',right:'<path d="M9 6l6 6-6 6"/>',
  clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+ wallet:'<rect x="3" y="6" width="18" height="14" rx="3"/><path d="M3 10h18M16 15h2"/><path d="M6 6l9-3 1.5 3"/>',
  send:'<path d="M21 4L3 11l6 2.5L11 20l3-5 4 3 3-14zM9 13.5L21 4"/>',
  inbox:'<path d="M4 13l2-8h12l2 8M4 13v6h16v-6M4 13h5l1 2h4l1-2h5"/>'
 };
@@ -740,7 +788,7 @@ function toast(m,undo){
 function go(v){view=v;render();window.scrollTo(0,0)}
 function renderNav(){
   const t=today(),open=S.tasks.filter(x=>!x.done&&x.date===t).length,od=S.tasks.filter(x=>!x.done&&x.date<t).length;
-  const items=[['day','cal','День',od?`<span class="badge red">${od}</span>`:(open?`<span class="badge">${open}</span>`:'')],['sched','clock','График',''],['plans','plans','Планы',''],['done','done','Готово',''],['bot','send','Бот',TG.token?`<span class="dot ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"></span>`:''],['data','data','Данные','']];
+  const items=[['day','cal','День',od?`<span class="badge red">${od}</span>`:(open?`<span class="badge">${open}</span>`:'')],['sched','clock','График',''],['plans','plans','Планы',''],['done','done','Готово',''],['exp','wallet','Расходы',''],['bot','send','Бот',TG.token?`<span class="dot ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"></span>`:''],['data','data','Данные','']];
   $('nav').innerHTML=items.map(([k,i,l,b])=>`<button class="${view===k?'on':''}" onclick="go('${k}')">${ic(i)}<span>${l}</span>${b}</button>`).join('');
 }
 
@@ -996,7 +1044,8 @@ function restore(inp){
     const ids=new Set(S.tasks.map(t=>t.id)),pids=new Set(S.plans.map(p=>p.id));
     const nt=o.tasks.filter(t=>!ids.has(t.id)),np=o.plans.filter(p=>!pids.has(p.id));
     const rids=new Set(S.routine.map(r=>r.id)),nr=(o.routine||[]).filter(r=>!rids.has(r.id));
-    S.tasks.push(...nt);S.plans.push(...np);S.routine.push(...nr);
+    const eids=new Set(S.exp.map(x=>x.id)),ne=(o.exp||[]).filter(x=>!eids.has(x.id));
+    S.tasks.push(...nt);S.plans.push(...np);S.routine.push(...nr);S.exp.push(...ne);
     for(const k in (o.rdone||{}))if(!S.rdone[k])S.rdone[k]=o.rdone[k];
     save();render();toast(`Добавлено: задач ${nt.length}, планов ${np.length}, пунктов графика ${nr.length}`);
   }catch(e){toast('Не удалось прочитать файл копии')}};
@@ -1045,7 +1094,7 @@ function doExport(){
 
 
 /* ======================= синхронизация между устройствами ======================= */
-const SYKEY='planner_sync_v1',SYFILE='planner-data.json',COLS=['tasks','plans','routine'];
+const SYKEY='planner_sync_v1',SYFILE='planner-data.json',COLS=['tasks','plans','routine','exp'];
 let SY={last:0},syStatus='off',syEtag='',syBusy=false,syAgain=false,syPending=false,syTimer=null,SNAP={tasks:{},plans:{},routine:{},rdone:{}};
 const SYS={off:'Не подключена',sync:'Синхронизация…',ok:'Синхронизировано',offline:'Нет связи, повторю позже',badtoken:'Токен не подходит или отозван — подключите заново'};
 function stable(v){
@@ -1072,15 +1121,15 @@ function stamp(){
   });
   return ch;
 }
-const dataOf=o=>({tasks:o.tasks||[],plans:o.plans||[],routine:o.routine||[],rdone:o.rdone||{},del:o.del||{},rdu:o.rdu||{}});
+const dataOf=o=>({tasks:o.tasks||[],plans:o.plans||[],routine:o.routine||[],exp:o.exp||[],rdone:o.rdone||{},del:o.del||{},rdu:o.rdu||{}});
 function canon(o){
   const d=dataOf(o),byId=(a,b)=>String(a.id).localeCompare(String(b.id)),rd={};
   for(const k in d.rdone)rd[k]=[...d.rdone[k]].sort();
-  return stable({...d,tasks:[...d.tasks].sort(byId),plans:[...d.plans].sort(byId),routine:[...d.routine].sort(byId),rdone:rd});
+  return stable({...d,tasks:[...d.tasks].sort(byId),plans:[...d.plans].sort(byId),routine:[...d.routine].sort(byId),exp:[...d.exp].sort(byId),rdone:rd});
 }
 function mergeData(L,R){
   L=dataOf(L);R=dataOf(R);
-  const out={tasks:[],plans:[],routine:[],rdone:{},del:{},rdu:{}},cutT=Date.now()-90*864e5;
+  const out={tasks:[],plans:[],routine:[],exp:[],rdone:{},del:{},rdu:{}},cutT=Date.now()-90*864e5;
   for(const id of new Set([...Object.keys(L.del),...Object.keys(R.del)])){const t=Math.max(L.del[id]||0,R.del[id]||0);if(t>cutT)out.del[id]=t}
   COLS.forEach(c=>{
     const rm=new Map(R[c].map(x=>[x.id,x])),seen=new Set();
@@ -1215,7 +1264,7 @@ async function auFromLink(){
   try{const u=await auCall('/auth/v1/user',null,h.get('access_token'));
     auSet({access_token:h.get('access_token'),refresh_token:h.get('refresh_token'),expires_in:+h.get('expires_in')||3600,user:u});auEnter()}catch(e){}
 }
-function wipeLocal(){S={tasks:[],plans:[],routine:[],rdone:{},del:{},rdu:{}};snap();persist()}
+function wipeLocal(){S={tasks:[],plans:[],routine:[],exp:[],rdone:{},del:{},rdu:{}};snap();persist()}
 function auEnter(){
   let owner='';try{owner=localStorage.getItem(OWKEY)||''}catch(e){}
   if(owner&&owner!==AU.uid)wipeLocal();          /* на устройстве были данные другого аккаунта */
@@ -1648,22 +1697,94 @@ function viewBot(){
       <div class="ex"><b>/overdue, /plans, /done</b><span>просроченные, планы, готовое</span></div></section>${how}</div>`;
 }
 window.addEventListener('storage',e=>{
-  if(e.key===KEY&&e.newValue){try{const o=JSON.parse(e.newValue);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};snap()}catch(_){}softRender()}
+  if(e.key===KEY&&e.newValue){try{const o=JSON.parse(e.newValue);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.exp=o.exp||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};snap()}catch(_){}softRender()}
   if(e.key===AUKEY){const was=AU&&AU.uid;auLoad();auGate();if((AU&&AU.uid)!==was){try{const o=JSON.parse(localStorage.getItem(KEY)||'{}');S={...S,...dataOf(o)};snap()}catch(_){}render();if(AU)syRun()}}
   if(e.key===TGKEY){tgLoad();if(!TG.token){tgRun++;if(tgAbort)tgAbort.abort();tgStatus='off'}else if(tgStatus==='off')tgLoop();softRender()}
 });
 
+
+/* ======================= расходы ======================= */
+const XC=[['food','Продукты','#3f7a5f'],['cafe','Кафе и еда вне дома','#c9871f'],['taxi','Транспорт и такси','#2f6bff'],['shop','Покупки','#7c4dff'],
+  ['home','Дом и счета','#0e8c8c'],['net','Связь и интернет','#5b6cff'],['health','Здоровье','#c8483c'],['fun','Развлечения','#d0569b'],['other','Другое','#7b857f']];
+const xcat=id=>XC.find(c=>c[0]===id)||XC[XC.length-1];
+let editExp=null;
+const money=n=>Math.round(n).toLocaleString('ru-RU').replace(/\u00a0|\u202f/g,' ');
+const expNum=v=>+String(v||'').replace(/[^\d]/g,'')||0;
+function expFmtIn(el){const n=expNum(el.value);el.value=n?money(n):''}
+const expSum=(a,b)=>S.exp.filter(x=>x.date>=a&&x.date<=b).reduce((t,x)=>t+(+x.amt||0),0);
+function expWeek(d){const x=parse(d),off=(x.getDay()+6)%7,a=addDays(d,-off);return [a,addDays(a,6)]}
+function expMonth(d){const y=d.slice(0,4),m=d.slice(5,7),last=new Date(+y,+m,0).getDate();return [y+'-'+m+'-01',y+'-'+m+'-'+String(last).padStart(2,'0')]}
+function viewExp(){
+  const d=expDate,t=today(),dx=parse(d),[wa,wb]=expWeek(d),[ma,mb]=expMonth(d);
+  const day=S.exp.filter(x=>x.date===d).sort((a,b)=>(b.time||'').localeCompare(a.time||'')||(b.created||0)-(a.created||0));
+  const sd=day.reduce((a,x)=>a+(+x.amt||0),0),sw=expSum(wa,wb),sm=expSum(ma,mb);
+  const lbl=d===t?'Сегодня':d===addDays(t,-1)?'Вчера':d===addDays(t,1)?'Завтра':WDF[dx.getDay()];
+  const by={};S.exp.filter(x=>x.date>=ma&&x.date<=mb).forEach(x=>by[x.cat]=(by[x.cat]||0)+(+x.amt||0));
+  const cats=Object.entries(by).sort((a,b)=>b[1]-a[1]),mx=cats.length?cats[0][1]:1;
+  const chips=XC.map(([id,n,c])=>`<button type="button" class="xChip${expCat===id?' on':''}" style="--c:${c}" onclick="expCat='${id}';document.querySelectorAll('.xChip').forEach(b=>b.classList.toggle('on',b===this))"><i></i>${esc(n)}</button>`).join('');
+  return `<div class="stack xWrap">
+    <section class="card xDay">
+      <button class="ib" onclick="expDate=addDays(expDate,-1);render()" aria-label="Предыдущий день">${ic('left')}</button>
+      <div class="xDayT"><small>${esc(lbl)}</small><b>${dx.getDate()} ${MON[dx.getMonth()]}</b></div>
+      ${d!==t?`<button class="btn sm" onclick="expDate=today();render()">Сегодня</button>`:''}
+      <button class="ib" onclick="expDate=addDays(expDate,1);render()" aria-label="Следующий день">${ic('right')}</button>
+    </section>
+    <section class="card">
+      <form class="xForm" onsubmit="event.preventDefault();addExp()">
+        <label class="xAmt"><input id="xAmt" type="text" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Сумма" oninput="expFmtIn(this)"><span>сум</span></label>
+        <div class="xChips" role="group" aria-label="Категория">${chips}</div>
+        <div class="xRow"><input id="xNote" type="text" maxlength="120" autocomplete="off" placeholder="На что потратили (необязательно)"><button type="submit" class="btn pri">${ic('plus')}Добавить</button></div>
+      </form>
+    </section>
+    <div class="stats3">
+      <div class="card stat"><b>${money(sd)}</b><span>за ${d===t?'сегодня':'этот день'}, сум</span></div>
+      <div class="card stat"><b>${money(sw)}</b><span>за неделю, сум</span></div>
+      <div class="card stat"><b>${money(sm)}</b><span>за ${['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'][dx.getMonth()]}, сум</span></div>
+    </div>
+    <div class="two">
+      <section class="card"><h2>Траты за день</h2>
+        ${day.length?`<div class="xList">${day.map(x=>{const c=xcat(x.cat);return `<button type="button" class="xItem" onclick="openExp('${x.id}')"><i style="background:${c[2]}"></i><span class="xInfo"><b>${esc(x.note||c[1])}</b><small>${x.time?esc(x.time)+' · ':''}${esc(c[1])}</small></span><span class="xSum">${money(x.amt)}</span></button>`}).join('')}</div>`
+        :`<p class="muted" style="margin:0">Пока ничего. Впишите сумму сверху и нажмите «Добавить».</p>`}
+      </section>
+      <section class="card"><h2>По категориям за месяц</h2>
+        ${cats.length?`<div class="xCats">${cats.map(([id,v])=>{const c=xcat(id);return `<div class="xCat"><div class="xCatT"><span><i style="background:${c[2]}"></i>${esc(c[1])}</span><b>${money(v)}</b></div><div class="xBar"><i style="width:${Math.max(3,Math.round(v/mx*100))}%;background:${c[2]}"></i></div></div>`}).join('')}</div>`
+        :`<p class="muted" style="margin:0">В этом месяце расходов ещё нет.</p>`}
+      </section>
+    </div>
+  </div>`;
+}
+function addExp(){
+  const el=$('xAmt'),n=expNum(el.value);if(!n){el.focus();toast('Введите сумму');return}
+  const now=new Date(),tm=expDate===today()?String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'):'';
+  S.exp.push({id:uid(),amt:n,cat:expCat,note:$('xNote').value.trim(),date:expDate,time:tm,created:Date.now()});
+  save();render();toast('Добавлено: '+money(n)+' сум');setTimeout(()=>{const a=$('xAmt');if(a)a.focus()},0);
+}
+function openExp(id){
+  const x=S.exp.find(e=>e.id===id);if(!x)return;editExp=id;
+  const sel=$('xeCat');if(!sel.options.length)sel.innerHTML=XC.map(([i,n])=>`<option value="${i}">${esc(n)}</option>`).join('');
+  $('xeAmt').value=money(x.amt);sel.value=x.cat;$('xeDate').value=x.date;$('xeTime').value=x.time||'';$('xeNote').value=x.note||'';
+  $('dlgExp').showModal();
+}
+function saveExpDlg(){
+  const x=S.exp.find(e=>e.id===editExp);if(!x)return;const n=expNum($('xeAmt').value);if(!n){$('xeAmt').focus();return}
+  Object.assign(x,{amt:n,cat:$('xeCat').value,date:$('xeDate').value||x.date,time:$('xeTime').value,note:$('xeNote').value.trim()});
+  $('dlgExp').close();save();render();toast('Расход сохранён');
+}
+function delExp(id,fromDlg){
+  const i=S.exp.findIndex(e=>e.id===id);if(i<0)return;const x=S.exp[i];S.exp.splice(i,1);
+  if(fromDlg)$('dlgExp').close();save();render();toast('Удалено: '+money(x.amt)+' сум',()=>S.exp.splice(i,0,x));
+}
 /* ======================= отрисовка ======================= */
 function render(){
   renderNav();
-  const T={day:'ASMO',sched:'График',plans:'Планы',done:'Выполнено',bot:'Телеграм-бот',data:'Данные'};
+  const T={day:'ASMO',sched:'График',plans:'Планы',done:'Выполнено',exp:'Расходы',bot:'Телеграм-бот',data:'Данные'};
   $('title').textContent=T[view];
   const pdf=`<button class="btn" onclick="dlgExport.showModal()">${ic('dl')}PDF</button>`;
   $('acts').innerHTML=pdf+(view==='day'?`<button class="btn pri" onclick="openTask()">${ic('plus')}Задача</button>`:view==='plans'?`<button class="btn pri" onclick="openPlan()">${ic('plus')}План</button>`:view==='sched'?`<button class="btn pri" onclick="openR()">${ic('plus')}Пункт</button>`:'');
-  $('view').innerHTML=view==='day'?viewDay():view==='plans'?viewPlans():view==='sched'?viewSched():view==='done'?viewDone():view==='bot'?viewBot():viewData();
+  $('view').innerHTML=view==='day'?viewDay():view==='plans'?viewPlans():view==='sched'?viewSched():view==='done'?viewDone():view==='exp'?viewExp():view==='bot'?viewBot():viewData();
   if(view==='done')renderDoneList();
 }
-['dlgTask','dlgPlan','dlgExport','dlgMove','dlgR'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target.id===id)e.target.close()}));
+['dlgTask','dlgPlan','dlgExport','dlgMove','dlgR','dlgExp'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target.id===id)e.target.close()}));
 syLoad();auLoad();load();tgLoad();save();render();auGate();auMode();auFromLink();tgLoop();syRun();setInterval(tgTick,30000);setTimeout(tgTick,4000);
 
 /* ======== свои выпадающие списки ======== */
