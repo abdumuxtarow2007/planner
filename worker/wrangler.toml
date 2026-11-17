@@ -1,0 +1,16 @@
+name = "asmo-bot"
+main = "src/index.js"
+compatibility_date = "2026-11-01"
+workers_dev = true
+
+[triggers]
+crons = ["* * * * *"]
+
+[vars]
+SUPABASE_URL = "https://twzdzxhgkncjfjdkavtn.supabase.co"
+
+[observability]
+enabled = true
+
+# Секрет SUPABASE_SERVICE_KEY задаётся в панели Cloudflare:
+# Workers & Pages → asmo-bot → Settings → Variables and Secrets.
