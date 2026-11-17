@@ -122,7 +122,7 @@ svg.i{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.8;stro
 .pr1{color:var(--pome)}.pr2{color:#b97a12}.pr3{color:var(--turq)}
 .time{background:var(--ground);padding:1px 8px;border-radius:6px;font-weight:600;color:var(--ink)}
 .ta{display:flex;gap:0;flex:none}
-@media (hover:hover){.ta{opacity:0;transition:opacity .15s}.task:hover .ta,.task:focus-within .ta{opacity:1}}
+@media (hover:hover){.ta{opacity:0;transition:opacity .15s}.task:hover .ta,.task:focus-within .ta,.ag:hover .ta,.ag:focus-within .ta,.ta.show{opacity:1}}
 .empty{text-align:center;padding:34px 10px 24px}
 .empty svg.i{width:38px;height:38px;color:#b5bccd;margin-bottom:8px}
 .empty b{display:block;font-size:16px;margin-bottom:2px}
@@ -224,6 +224,11 @@ h2 + .ex{border-top:0}
 .dchips button.on small{color:rgba(255,255,255,.75)}
 .seg.days{grid-template-columns:repeat(7,1fr);gap:5px}
 .seg.days span{padding:9px 0}
+.rEdit{cursor:pointer;border-radius:12px}
+.rEdit:hover{background:var(--ground)}
+.scopeBox{display:flex;flex-direction:column;gap:6px;background:var(--tint);border-radius:12px;padding:10px 12px;font-size:13px;font-weight:600;color:var(--muted)}
+.scopeBox label{display:flex;gap:8px;align-items:center;color:var(--ink);font-weight:500;font-size:14px;cursor:pointer}
+.scopeBox input{accent-color:var(--lapis);width:16px;height:16px}
 .hide{display:none!important}
 
 @media (max-width:900px){
@@ -435,7 +440,12 @@ body.locked .app{display:none}
         <label class="f">Начало<input type="time" id="rStart" required></label>
         <label class="f">Конец (необязательно)<input type="time" id="rEnd"></label>
       </div>
-      <div style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Дни недели
+      <div class="scopeBox hide" id="rScopeW">
+        <span>Изменить</span>
+        <label><input type="radio" name="rscope" value="all" checked onchange="rScope()"><span id="rScopeAll">во все дни</span></label>
+        <label><input type="radio" name="rscope" value="one" onchange="rScope()"><span id="rScopeOne">только в этот день</span></label>
+      </div>
+      <div id="rDaysW" style="display:flex;flex-direction:column;gap:6px;font-size:13px;font-weight:600;color:var(--muted)">Дни недели
         <div class="seg days">
           <label><input type="checkbox" name="rday" value="1"><span>Пн</span></label><label><input type="checkbox" name="rday" value="2"><span>Вт</span></label>
           <label><input type="checkbox" name="rday" value="3"><span>Ср</span></label><label><input type="checkbox" name="rday" value="4"><span>Чт</span></label>
@@ -447,6 +457,7 @@ body.locked .app{display:none}
       <label class="f">Заметка<input type="text" id="rNote" autocomplete="off"></label>
     </div>
     <div class="dFoot">
+      <button type="button" class="btn danger hide" id="drDel" onclick="delRFromDlg()" style="margin-right:auto">Удалить</button>
       <button type="button" class="btn" onclick="dlgR.close()">Отмена</button>
       <button type="submit" class="btn pri" id="drSave">Добавить</button>
     </div>
@@ -1123,6 +1134,7 @@ function agendaHTML(d){
     <div class="agT">${esc(x.start)}${x.end?`<small>${esc(x.end)}</small>`:''}</div>
     <button class="chk" aria-label="${x.done?'Снять отметку':'Отметить сделанным'}" onclick="${x.kind==='r'?`toggleR('${x.id}','${d}')`:`toggleTask('${x.id}')`}">${ic('chk')}</button>
     <div class="tb"><div class="tt">${esc(x.title)}</div>${x.state==='now'&&!x.done?'<span class="chip ok">сейчас</span> ':''}${x.kind==='t'?'<span class="chip">задача</span>':''}${x.note?`<div class="tn">${esc(x.note)}</div>`:''}</div>
+    <div class="ta"><button class="ib" title="Изменить" onclick="${x.kind==='r'?`openR('${x.id}',dow('${d}'))`:`openTask('${x.id}')`}">${ic('edit')}</button></div>
   </div>`).join('');
 }
 function dayScheduleCard(){
@@ -1130,30 +1142,56 @@ function dayScheduleCard(){
   return `<section class="card"><div class="listHead"><h2>График дня</h2><button class="btn sm" onclick="schedDay=dow(selDate);go('sched')">${has?'Изменить':'Настроить'}</button></div>
     ${has?agendaHTML(selDate):'<p class="muted small" style="margin:6px 0 0">На этот день графика нет. Запишите распорядок — подъём, работа, спорт — и он будет появляться здесь каждый день.</p>'}</section>`;
 }
-function openR(id){
+let editRDay=0;
+const DAYN=['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'],DAYN4=['в понедельник','во вторник','в среду','в четверг','в пятницу','в субботу','в воскресенье'];
+function openR(id,day){
   editR=id||null;const r=id?S.routine.find(x=>x.id===id):null;
+  editRDay=r?(day&&r.days.includes(day)?day:(r.days.includes(schedDay)?schedDay:r.days[0])):0;
   $('drTitle').textContent=r?'Изменить пункт графика':'Новый пункт графика';$('drSave').textContent=r?'Сохранить':'Добавить';
   $('rTitle').value=r?r.title:'';$('rStart').value=r?r.start:'';$('rEnd').value=r?r.end||'':'';$('rNote').value=r?r.note||'':'';
-  setRDays(r?r.days:[1,2,3,4,5,6,7]);
+  setRDays(r?r.days:(schedDay&&view==='sched'?[schedDay]:[1,2,3,4,5,6,7]));
+  const multi=!!r&&r.days.length>1;
+  $('rScopeW').classList.toggle('hide',!multi);
+  if(multi){$('rScopeAll').textContent='во все дни ('+daysLabel(r.days)+')';$('rScopeOne').textContent='только '+DAYN4[editRDay-1];}
+  document.querySelector('input[name=rscope][value=all]').checked=true;
+  $('drDel').classList.toggle('hide',!r);rScope();
   $('dlgR').showModal();$('rTitle').focus();
 }
+function rScope(){
+  const one=!$('rScopeW').classList.contains('hide')&&document.querySelector('input[name=rscope]:checked').value==='one';
+  $('rDaysW').classList.toggle('hide',one);
+}
+const rOne=()=>!$('rScopeW').classList.contains('hide')&&document.querySelector('input[name=rscope]:checked').value==='one';
 function setRDays(ds){document.querySelectorAll('input[name=rday]').forEach(c=>c.checked=ds.includes(+c.value))}
 function saveR(){
-  const title=$('rTitle').value.trim(),start=$('rStart').value,end=$('rEnd').value;
-  const days=[...document.querySelectorAll('input[name=rday]:checked')].map(c=>+c.value);
+  const title=$('rTitle').value.trim(),start=$('rStart').value,end=$('rEnd').value,one=rOne();
+  const days=one?[editRDay]:[...document.querySelectorAll('input[name=rday]:checked')].map(c=>+c.value);
   if(!title||!start)return;
   if(!days.length){toast('Выберите хотя бы один день недели');return}
   if(end&&end<=start){toast('Время окончания должно быть позже начала');return}
   const o={title,start,end,days,note:$('rNote').value.trim()};
-  if(editR)Object.assign(S.routine.find(x=>x.id===editR),o);else S.routine.push({id:uid(),...o});
+  let msg='Пункт добавлен в график',undo=null;
+  if(editR){
+    const r=S.routine.find(x=>x.id===editR),old=JSON.parse(JSON.stringify(r));
+    if(one){
+      const nid=uid();r.days=r.days.filter(d=>d!==editRDay);S.routine.push({id:nid,...o});
+      msg='Изменено только '+DAYN4[editRDay-1];
+      undo=()=>{Object.assign(r,old);S.routine=S.routine.filter(x=>x.id!==nid)};
+    }else{Object.assign(r,o);msg='Пункт графика обновлён';undo=()=>Object.assign(r,old)}
+  }else S.routine.push({id:uid(),...o});
   if(!days.includes(schedDay))schedDay=days[0];
-  save();$('dlgR').close();render();toast(editR?'Пункт графика обновлён':'Пункт добавлен в график');
+  save();$('dlgR').close();render();toast(msg,undo);
 }
-function delR(id){
+function delR(id,day){
   const i=S.routine.findIndex(x=>x.id===id),r=S.routine[i];
+  if(day&&r.days.length>1){
+    const old=[...r.days];r.days=r.days.filter(d=>d!==day);save();render();
+    toast('Убрано из графика '+DAYN4[day-1],()=>{r.days=old});return;
+  }
   S.routine.splice(i,1);save();render();
   toast('Пункт удалён из графика',()=>S.routine.splice(Math.min(i,S.routine.length),0,r));
 }
+function delRFromDlg(){const id=editR,d=rOne()?editRDay:0;$('dlgR').close();delR(id,d)}
 function viewSched(){
   if(!schedDay)schedDay=dow(today());
   const td=dow(today());
@@ -1162,11 +1200,11 @@ function viewSched(){
   if(!S.routine.length)return chips+`<section class="card empty">${ic('clock')}<b>График пока пуст</b><p>Запишите свой обычный день: во сколько подъём, работа, обед, спорт. Пункты повторяются по выбранным дням недели.</p><button class="btn pri" onclick="openR()">${ic('plus')}Добавить первый пункт</button></section>`;
   const list=S.routine.filter(r=>r.days.includes(schedDay)).sort((a,b)=>a.start.localeCompare(b.start));
   return chips+`<section class="card" style="max-width:720px"><div class="listHead"><h2>${['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'][schedDay-1]}</h2><span class="muted small">${list.length?'пунктов: '+list.length:''}</span></div>
-    ${list.length?list.map(r=>`<div class="ag next"><div class="agT">${esc(r.start)}${r.end?`<small>${esc(r.end)}</small>`:''}</div>
+    ${list.length?list.map(r=>`<div class="ag next rEdit" role="button" tabindex="0" title="Нажмите, чтобы изменить" onclick="openR('${r.id}',${schedDay})" onkeydown="if(event.key==='Enter')openR('${r.id}',${schedDay})"><div class="agT">${esc(r.start)}${r.end?`<small>${esc(r.end)}</small>`:''}</div>
       <div class="tb"><div class="tt">${esc(r.title)}</div><div class="tm"><span>${esc(daysLabel(r.days))}</span></div>${r.note?`<div class="tn">${esc(r.note)}</div>`:''}</div>
-      <div class="ta"><button class="ib" title="Изменить" onclick="openR('${r.id}')">${ic('edit')}</button><button class="ib" title="Удалить" onclick="delR('${r.id}')">${ic('trash')}</button></div></div>`).join('')
+      <div class="ta show"><button class="ib" title="Изменить" onclick="event.stopPropagation();openR('${r.id}',${schedDay})">${ic('edit')}</button><button class="ib" title="${r.days.length>1?'Убрать из этого дня':'Удалить'}" onclick="event.stopPropagation();delR('${r.id}',${schedDay})">${ic('trash')}</button></div></div>`).join('')
     :'<p class="muted" style="margin:10px 0 4px">На этот день недели пунктов нет.</p>'}</section>
-    <p class="muted small" style="max-width:720px;margin:12px 4px 0">График показывается на главном экране в карточке «График дня». Если подключён бот, он напоминает о каждом пункте в его время и присылает график по команде /schedule.</p>`;
+    <p class="muted small" style="max-width:720px;margin:12px 4px 0">Нажмите на пункт, чтобы изменить время, название или дни. Изменение можно применить ко всем дням или только к выбранному. График показывается на главном экране в карточке «График дня». Если подключён бот, он напоминает о каждом пункте в его время и присылает график по команде /schedule.</p>`;
 }
 function tgAgenda(d){
   const a=agenda(d);if(!a.length)return '';
