@@ -1687,12 +1687,12 @@ function viewBot(){
     <p class="muted" style="margin:0 0 8px">Бот работает на сервере круглосуточно. Сайт можно закрыть — бот всё равно ответит, добавит задачу и напомнит о деле.</p>
     <p class="muted" style="margin:0">Задачи из Telegram появляются в планировщике на всех устройствах, где вы вошли в аккаунт.</p></section>`;
   if(!tgHas()&&AU&&SHAREDBOT===null)return '<div class="stack" style="max-width:640px"><section class="card"><p class="muted" style="margin:0">Загрузка…</p></section></div>';
-  if(!tgHas()&&SHAREDBOT)return §<div class="stack" style="max-width:640px">
+  if(!tgHas()&&SHAREDBOT)return `<div class="stack" style="max-width:640px">
     <section class="card"><h2>Подключите Telegram</h2>
       <p class="muted" style="margin:0 0 14px">Бот <b>@${esc(SHAREDBOT)}</b> один на всех: он пришлёт вам список дел и напоминания и добавит задачу из вашего сообщения. Создавать своего бота не нужно.</p>
       <div class="row"><button class="btn pri" id="tgBtn" onclick="tgConnectShared()">${ic('send')}Подключить Telegram</button></div>
-      <p class="muted small" style="margin:10px 0 0">Откроется бот, останется нажать «Начать». Привязка к вашему аккаунту идёт по одноразовому коду, так что чужие сообщения до ваших задач не доберутся.</p></section>${how}</div>§;
-  if(!tgHas())return §<div class="stack" style="max-width:640px">
+      <p class="muted small" style="margin:10px 0 0">Откроется бот, останется нажать «Начать». Привязка к вашему аккаунту идёт по одноразовому коду, так что чужие сообщения до ваших задач не доберутся.</p></section>${how}</div>`;
+  if(!tgHas())return `<div class="stack" style="max-width:640px">
     <section class="card"><h2>Подключение за две минуты</h2>
       <ol class="steps"><li>Откройте в Telegram <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> и отправьте ему <b>/newbot</b>.</li>
       <li>Придумайте боту имя и адрес. Адрес должен заканчиваться на <b>bot</b>, например <i>moy_den_bot</i>.</li>
