@@ -1552,13 +1552,16 @@ function printOut(h){
 /* Бот работает на сервере (Cloudflare Worker asmo-bot): принимает сообщения через webhook и шлёт напоминания,
    даже когда сайт закрыт. Сайт только подключает бота и хранит его настройки в Supabase (таблица planner_bot). */
 const BOT_URL='https://asmo-bot.sunnatbek-abdumuxtorov.workers.dev';
+/* общий бот: null — ещё не знаем, '' — общего бота нет (старый режим со своим токеном), иначе имя общего бота */
+let SHAREDBOT=null;
+const tgHas=()=>!!(TG.token||TG.shared);
 const TGKEY='planner_tg_v1';   /* старое хранилище бота в браузере — используется только для переноса */
-const TG0={token:'',bot:'',chat:null,chatName:'',code:'',digest:true,digestTime:'09:00',remind:true,tz:''};
+const TG0={token:'',bot:'',chat:null,chatName:'',code:'',digest:true,digestTime:'09:00',remind:true,tz:'',shared:false};
 let TG={...TG0},tgStatus='off',tgRun=0,tgAbort=null,tgPoll=null;
 const TGS={off:'Не подключён',load:'Загрузка…',pair:'Ждёт код привязки',on:'Работает круглосуточно',
   offline:'Нет связи с сервером, повторю позже',badtoken:'Токен больше не подходит — подключите бота заново'};
 const devTz=()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'Asia/Tashkent'}catch(e){return 'Asia/Tashkent'}};
-const rowToTg=r=>({token:r.token,bot:r.bot,chat:r.chat?Number(r.chat):null,chatName:r.chat_name||'',code:r.code||'',digest:r.digest,digestTime:r.digest_time||'09:00',remind:r.remind,tz:r.tz||''});
+const rowToTg=r=>({token:r.token,bot:r.bot,chat:r.chat?Number(r.chat):null,chatName:r.chat_name||'',code:r.code||'',digest:r.digest,digestTime:r.digest_time||'09:00',remind:r.remind,tz:r.tz||'',shared:!r.token});
 function tgSave(){try{localStorage.removeItem(TGKEY)}catch(e){}}
 function softRender(){const a=document.activeElement;if(a&&$('view').contains(a)&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)){renderNav();return}render()}
 function setTg(s){if(s===tgStatus)return;tgStatus=s;if(view==='bot')softRender();else renderNav()}
@@ -1590,6 +1593,10 @@ async function tgLoad(){
   if(!AU){TG={...TG0};setTg('off');return}
   const run=++tgRun;
   try{
+    if(SHAREDBOT===null){
+      try{const j=await fetch(BOT_URL+'/info',{cache:'no-store'}).then(r=>r.json());SHAREDBOT=j.shared?j.bot:''}catch(e){SHAREDBOT=''}
+      if(run!==tgRun)return;if(view==='bot')softRender();
+    }
     const rows=await botApi('GET');if(run!==tgRun)return;
     if(rows[0]){TG=rowToTg(rows[0]);tgSave();setTg(TG.chat?'on':'pair')}
     else{
@@ -1604,14 +1611,14 @@ async function tgLoad(){
           tz:TG.tz,digest:TG.digest,digest_time:TG.digestTime,remind:TG.remind,last_digest:today()});
         await tgHook(secret);tgSave();toast('Бот перенесён на сервер — теперь он работает и при закрытом сайте');
       }
-      setTg(TG.token?(TG.chat?'on':'pair'):'off');
+      setTg(tgHas()?(TG.chat?'on':'pair'):'off');
     }
   }catch(e){if(run===tgRun)setTg(e.code===401?'badtoken':'offline')}
   tgPollUpd();
 }
 /* пока ждём привязки, проверяем, не прислал ли пользователь код боту */
 function tgPollUpd(){
-  const need=AU&&TG.token&&!TG.chat&&view==='bot';
+  const need=AU&&tgHas()&&!TG.chat&&view==='bot';
   if(need&&!tgPoll)tgPoll=setInterval(()=>{if(document.visibilityState==='visible')tgLoad()},4000);
   if(!need&&tgPoll){clearInterval(tgPoll);tgPoll=null}
 }
@@ -1652,9 +1659,18 @@ async function tgConnect(){
     toast(e.code===401||e.code===404?'Токен не подходит. Скопируйте его из BotFather целиком.':'Не удалось подключить бота. Проверьте интернет и попробуйте ещё раз.');
   }
 }
+async function tgConnectShared(){
+  if(!AU){toast('Сначала войдите в аккаунт');return}
+  const b=$('tgBtn');if(b)b.disabled=true;
+  const al='abcdefghjkmnpqrstuvwxyz23456789',code=[...crypto.getRandomValues(new Uint8Array(10))].map(x=>al[x%al.length]).join('');
+  try{
+    await botApi('POST',{user_id:AU.uid,token:'',bot:SHAREDBOT,hook_secret:'',code,chat:null,chat_name:'',tz:devTz(),digest:true,digest_time:'09:00',remind:true,last_digest:today(),sent:{}});
+    TG={...TG0,bot:SHAREDBOT,code,tz:devTz(),shared:true};setTg('pair');render();tgPollUpd();
+  }catch(e){if(b)b.disabled=false;toast('Не удалось подключить. Проверьте интернет и попробуйте ещё раз.')}
+}
 async function tgDisconnect(){
   if(!confirm('Отключить бота от планировщика? Задачи останутся на месте.'))return;
-  try{await tg('deleteWebhook').catch(()=>{});await botApi('DELETE')}
+  try{if(TG.token)await tg('deleteWebhook').catch(()=>{});await botApi('DELETE')}
   catch(e){toast('Не удалось отключить. Проверьте интернет.');return}
   tgRun++;TG={...TG0};tgSave();tgStatus='off';tgPollUpd();render();toast('Бот отключён');
 }
@@ -1670,7 +1686,13 @@ function viewBot(){
   const how=`<section class="card"><h2>Как это работает</h2>
     <p class="muted" style="margin:0 0 8px">Бот работает на сервере круглосуточно. Сайт можно закрыть — бот всё равно ответит, добавит задачу и напомнит о деле.</p>
     <p class="muted" style="margin:0">Задачи из Telegram появляются в планировщике на всех устройствах, где вы вошли в аккаунт.</p></section>`;
-  if(!TG.token)return `<div class="stack" style="max-width:640px">
+  if(!tgHas()&&AU&&SHAREDBOT===null)return '<div class="stack" style="max-width:640px"><section class="card"><p class="muted" style="margin:0">Загрузка…</p></section></div>';
+  if(!tgHas()&&SHAREDBOT)return §<div class="stack" style="max-width:640px">
+    <section class="card"><h2>Подключите Telegram</h2>
+      <p class="muted" style="margin:0 0 14px">Бот <b>@${esc(SHAREDBOT)}</b> один на всех: он пришлёт вам список дел и напоминания и добавит задачу из вашего сообщения. Создавать своего бота не нужно.</p>
+      <div class="row"><button class="btn pri" id="tgBtn" onclick="tgConnectShared()">${ic('send')}Подключить Telegram</button></div>
+      <p class="muted small" style="margin:10px 0 0">Откроется бот, останется нажать «Начать». Привязка к вашему аккаунту идёт по одноразовому коду, так что чужие сообщения до ваших задач не доберутся.</p></section>${how}</div>§;
+  if(!tgHas())return §<div class="stack" style="max-width:640px">
     <section class="card"><h2>Подключение за две минуты</h2>
       <ol class="steps"><li>Откройте в Telegram <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> и отправьте ему <b>/newbot</b>.</li>
       <li>Придумайте боту имя и адрес. Адрес должен заканчиваться на <b>bot</b>, например <i>moy_den_bot</i>.</li>
@@ -1688,8 +1710,8 @@ function viewBot(){
   return `<div class="stack" style="max-width:640px">
     <section class="card"><h2>@${esc(TG.bot)}</h2>${st}
       <p class="muted" style="margin:10px 0 14px">Привязан к чату: ${esc(TG.chatName||'личный чат')}</p>
-      <div class="row"><button class="btn pri" onclick="tgSendNow()">${ic('send')}Отправить задачи на сегодня</button>
-      <a class="btn" href="https://t.me/${esc(TG.bot)}" target="_blank" rel="noopener">Открыть бота</a>
+      <div class="row">${TG.shared?'':`<button class="btn pri" onclick="tgSendNow()">${ic('send')}Отправить задачи на сегодня</button>`}
+      <a class="btn${TG.shared?' pri':''}" href="https://t.me/${esc(TG.bot)}" target="_blank" rel="noopener">Открыть бота</a>
       <button class="btn danger" onclick="tgDisconnect()">Отключить</button></div></section>
     <section class="card"><h2>Уведомления</h2>
       <label class="opt"><input type="checkbox" ${TG.digest?'checked':''} onchange="tgSet('digest',this.checked)"><span>Утренняя сводка с планом на день</span>
