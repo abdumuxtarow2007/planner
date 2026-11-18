@@ -512,6 +512,16 @@ body{background:var(--ground);color:var(--ink)}
 .xCatT b{font-variant-numeric:tabular-nums}
 .xBar{height:8px;background:#eef1ee;border-radius:99px;overflow:hidden}.xBar i{display:block;height:100%;border-radius:99px}
 @media (max-width:760px){.xWrap .stats3{grid-template-columns:repeat(3,1fr);gap:8px}.xWrap .stat{padding:12px}.xWrap .stat b{font-size:19px}.xWrap .stat span{font-size:12px}.xAmt input{font-size:34px!important}.xRow{flex-direction:column}.xRow .btn{width:100%;justify-content:center}.nav button{font-size:10px}.nav button span{white-space:nowrap}}
+
+/* ---------- изменения графика на день ---------- */
+.ag.skip{opacity:.75}.ag.skip .tt{text-decoration:line-through;color:var(--muted)}
+.ag.skip .agT{color:var(--muted);text-decoration:line-through}
+.chip.rxc{background:#faf0da;color:#7a5200}
+.rxAlt{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:16px}
+.rxAdd{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;padding:11px;border:1.5px dashed #c3cac5;border-radius:14px;background:none;font:inherit;font-weight:600;font-size:14px;color:var(--muted);cursor:pointer}
+.rxAdd:hover{border-color:var(--acc);color:var(--acc);background:#f3f7f4}
+.linkBtn{background:none;border:0;font:inherit;font-size:14px;font-weight:600;color:var(--acc);cursor:pointer;padding:6px 4px;margin-left:auto}
+.linkBtn:hover{text-decoration:underline}
 </style>
 </head>
 <body>
@@ -630,6 +640,32 @@ body{background:var(--ground);color:var(--ink)}
   </form>
 </dialog>
 
+<!-- Изменение графика на день -->
+<dialog id="dlgRX">
+  <form onsubmit="event.preventDefault();saveRX()">
+    <h2 id="rxHead">Изменить на сегодня</h2>
+    <p class="muted small" id="rxSub" style="margin:-6px 0 14px"></p>
+    <div class="fg">
+      <label class="f">Что делаю<input type="text" id="rxTitle" required autocomplete="off" placeholder="Например: работа вместо учёбы"></label>
+      <div class="two">
+        <label class="f">Начало<input type="time" id="rxStart" required></label>
+        <label class="f">Конец (необязательно)<input type="time" id="rxEnd"></label>
+      </div>
+      <label class="f">Причина или заметка<input type="text" id="rxNote" autocomplete="off" placeholder="Например: срочный проект"></label>
+    </div>
+    <div class="rxAlt">
+      <button type="button" class="btn sm" id="rxSkipB" onclick="rxSkip()">Отменить на этот день</button>
+      <button type="button" class="btn sm" id="rxResetB" onclick="rxReset()">Вернуть как обычно</button>
+      <button type="button" class="btn sm danger" id="rxDelB" onclick="rxDelAdd()">Удалить</button>
+      <button type="button" class="linkBtn" id="rxPermB" onclick="const id=rxRid,d=rxDate;dlgRX.close();openR(id,dow(d))">Изменить постоянный график</button>
+    </div>
+    <div class="dFoot">
+      <button type="button" class="btn" onclick="dlgRX.close()">Отмена</button>
+      <button type="submit" class="btn pri">Сохранить на этот день</button>
+    </div>
+  </form>
+</dialog>
+
 <!-- План -->
 <dialog id="dlgPlan">
   <form onsubmit="event.preventDefault();savePlan()">
@@ -715,14 +751,14 @@ body{background:var(--ground);color:var(--ink)}
 const KEY='planner_v1', SEEDKEY='planner_seeded_v1';
 const SEED=[];
 const SEED_PLANS=[];
-let S={tasks:[],plans:[],routine:[],exp:[],rdone:{},del:{},rdu:{}},storageOK=true;
+let S={tasks:[],plans:[],routine:[],exp:[],rx:[],rdone:{},del:{},rdu:{}},storageOK=true;
 let expDate=iso(new Date()),expCat='food',view='day',selDate=iso(new Date()),editTask=null,editPlan=null,doneQ='',doneRange='all';
 
 function load(){
   let seeded=false;
   try{
     const raw=localStorage.getItem(KEY);
-    if(raw){const o=JSON.parse(raw);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.exp=o.exp||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};
+    if(raw){const o=JSON.parse(raw);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.exp=o.exp||[];S.rx=o.rx||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};
       const old=addDays(iso(new Date()),-60);for(const k in S.rdone)if(k<old)delete S.rdone[k]}
     seeded=!!localStorage.getItem(SEEDKEY);
   }catch(e){storageOK=false}
@@ -785,7 +821,7 @@ function toast(m,undo){
 }
 
 /* ======================= навигация ======================= */
-function go(v){view=v;render();window.scrollTo(0,0);if(v==='bot'&&AU)tgLoad();else tgPollUpd()}
+function go(v){view=v;render();window.scrollTo(0,0)}
 function renderNav(){
   const t=today(),open=S.tasks.filter(x=>!x.done&&x.date===t).length,od=S.tasks.filter(x=>!x.done&&x.date<t).length;
   const items=[['day','cal','День',od?`<span class="badge red">${od}</span>`:(open?`<span class="badge">${open}</span>`:'')],['sched','clock','График',''],['plans','plans','Планы',''],['done','done','Готово',''],['exp','wallet','Расходы',''],['bot','send','Бот',TG.token?`<span class="dot ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"></span>`:''],['data','data','Данные','']];
@@ -1055,7 +1091,7 @@ function restore(inp){
     const ids=new Set(S.tasks.map(t=>t.id)),pids=new Set(S.plans.map(p=>p.id));
     const nt=o.tasks.filter(t=>!ids.has(t.id)),np=o.plans.filter(p=>!pids.has(p.id));
     const rids=new Set(S.routine.map(r=>r.id)),nr=(o.routine||[]).filter(r=>!rids.has(r.id));
-    const eids=new Set(S.exp.map(x=>x.id)),ne=(o.exp||[]).filter(x=>!eids.has(x.id));
+    const eids=new Set(S.exp.map(x=>x.id)),ne=(o.exp||[]).filter(x=>!eids.has(x.id)),xids=new Set(S.rx.map(x=>x.id));S.rx.push(...(o.rx||[]).filter(x=>!xids.has(x.id)));
     S.tasks.push(...nt);S.plans.push(...np);S.routine.push(...nr);S.exp.push(...ne);
     for(const k in (o.rdone||{}))if(!S.rdone[k])S.rdone[k]=o.rdone[k];
     save();render();toast(`Добавлено: задач ${nt.length}, планов ${np.length}, пунктов графика ${nr.length}`);
@@ -1105,7 +1141,7 @@ function doExport(){
 
 
 /* ======================= синхронизация между устройствами ======================= */
-const SYKEY='planner_sync_v1',SYFILE='planner-data.json',COLS=['tasks','plans','routine','exp'];
+const SYKEY='planner_sync_v1',SYFILE='planner-data.json',COLS=['tasks','plans','routine','exp','rx'];
 let SY={last:0},syStatus='off',syEtag='',syBusy=false,syAgain=false,syPending=false,syTimer=null,SNAP={tasks:{},plans:{},routine:{},rdone:{}};
 const SYS={off:'Не подключена',sync:'Синхронизация…',ok:'Синхронизировано',offline:'Нет связи, повторю позже',badtoken:'Токен не подходит или отозван — подключите заново'};
 function stable(v){
@@ -1132,15 +1168,15 @@ function stamp(){
   });
   return ch;
 }
-const dataOf=o=>({tasks:o.tasks||[],plans:o.plans||[],routine:o.routine||[],exp:o.exp||[],rdone:o.rdone||{},del:o.del||{},rdu:o.rdu||{}});
+const dataOf=o=>({tasks:o.tasks||[],plans:o.plans||[],routine:o.routine||[],exp:o.exp||[],rx:o.rx||[],rdone:o.rdone||{},del:o.del||{},rdu:o.rdu||{}});
 function canon(o){
   const d=dataOf(o),byId=(a,b)=>String(a.id).localeCompare(String(b.id)),rd={};
   for(const k in d.rdone)rd[k]=[...d.rdone[k]].sort();
-  return stable({...d,tasks:[...d.tasks].sort(byId),plans:[...d.plans].sort(byId),routine:[...d.routine].sort(byId),exp:[...d.exp].sort(byId),rdone:rd});
+  return stable({...d,tasks:[...d.tasks].sort(byId),plans:[...d.plans].sort(byId),routine:[...d.routine].sort(byId),exp:[...d.exp].sort(byId),rx:[...d.rx].sort(byId),rdone:rd});
 }
 function mergeData(L,R){
   L=dataOf(L);R=dataOf(R);
-  const out={tasks:[],plans:[],routine:[],exp:[],rdone:{},del:{},rdu:{}},cutT=Date.now()-90*864e5;
+  const out={tasks:[],plans:[],routine:[],exp:[],rx:[],rdone:{},del:{},rdu:{}},cutT=Date.now()-90*864e5;
   for(const id of new Set([...Object.keys(L.del),...Object.keys(R.del)])){const t=Math.max(L.del[id]||0,R.del[id]||0);if(t>cutT)out.del[id]=t}
   COLS.forEach(c=>{
     const rm=new Map(R[c].map(x=>[x.id,x])),seen=new Set();
@@ -1275,12 +1311,12 @@ async function auFromLink(){
   try{const u=await auCall('/auth/v1/user',null,h.get('access_token'));
     auSet({access_token:h.get('access_token'),refresh_token:h.get('refresh_token'),expires_in:+h.get('expires_in')||3600,user:u});auEnter()}catch(e){}
 }
-function wipeLocal(){S={tasks:[],plans:[],routine:[],exp:[],rdone:{},del:{},rdu:{}};snap();persist()}
+function wipeLocal(){S={tasks:[],plans:[],routine:[],exp:[],rx:[],rdone:{},del:{},rdu:{}};snap();persist()}
 function auEnter(){
   let owner='';try{owner=localStorage.getItem(OWKEY)||''}catch(e){}
   if(owner&&owner!==AU.uid)wipeLocal();          /* на устройстве были данные другого аккаунта */
   try{localStorage.setItem(OWKEY,AU.uid)}catch(e){}
-  $('auPass').value='';$('auCode').value='';auGate();view='day';render();syPending=true;syRun();tgLoad();
+  $('auPass').value='';$('auCode').value='';auGate();view='day';render();syPending=true;syRun();
 }
 function accUpd(){
   if(!AU)return;
@@ -1338,7 +1374,20 @@ setInterval(()=>{if(document.visibilityState==='visible')syRun()},45000);
 /* ======================= график дня ======================= */
 let schedDay=0,editR=null;
 const dow=s=>(parse(s).getDay()+6)%7+1;
-const dayRoutine=d=>S.routine.filter(r=>r.days.includes(dow(d))).sort((a,b)=>a.start.localeCompare(b.start));
+const baseRoutine=d=>S.routine.filter(r=>r.days.includes(dow(d)));
+/* график конкретного дня с учётом изменений (замена, отмена, добавление) */
+function dayRoutineX(d){
+  const ov=S.rx.filter(x=>x.date===d),out=[];
+  for(const r of baseRoutine(d)){
+    const o=ov.find(x=>x.rid===r.id);
+    if(o&&o.kind==='skip')out.push({...r,skip:true,ovId:o.id});
+    else if(o&&o.kind==='edit')out.push({...r,title:o.title,start:o.start,end:o.end||'',note:o.note||'',changed:true,ovId:o.id,orig:r});
+    else out.push({...r});
+  }
+  ov.filter(x=>x.kind==='add').forEach(x=>out.push({id:x.id,title:x.title,start:x.start,end:x.end||'',note:x.note||'',added:true,ovId:x.id}));
+  return out.sort((a,b)=>a.start.localeCompare(b.start));
+}
+const dayRoutine=d=>dayRoutineX(d).filter(r=>!r.skip);
 const rIsDone=(id,d)=>(S.rdone[d]||[]).includes(id);
 const nowHM=()=>{const n=new Date();return String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0')};
 const plusHour=hm=>{const m=Math.min(1439,(+hm.slice(0,2))*60+(+hm.slice(3))+60);return String(Math.floor(m/60)).padStart(2,'0')+':'+String(m%60).padStart(2,'0')};
@@ -1352,32 +1401,77 @@ function toggleR(id,d){
   if(!a.length)delete S.rdone[d];save();render();
 }
 /* общий список дня: пункты графика + задачи со временем */
-function agenda(d){
-  const items=dayRoutine(d).map(r=>({kind:'r',id:r.id,start:r.start,end:r.end||'',title:r.title,note:r.note||'',done:rIsDone(r.id,d)}))
+function agenda(d,withSkip){
+  const items=(withSkip?dayRoutineX(d):dayRoutine(d)).map(r=>({kind:'r',id:r.id,start:r.start,end:r.end||'',title:r.title,note:r.note||'',done:rIsDone(r.id,d),skip:!!r.skip,changed:!!r.changed,added:!!r.added,orig:r.orig}))
     .concat(dayTasks(d).filter(t=>t.time).map(t=>({kind:'t',id:t.id,start:t.time,end:'',title:t.title,note:'',done:t.done})))
     .sort((a,b)=>a.start.localeCompare(b.start));
   if(d===today()){
     const hm=nowHM();
     items.forEach((x,i)=>{
-      const nx=items.slice(i+1).find(y=>y.start>x.start),lim=x.end||(nx&&nx.start<plusHour(x.start)?nx.start:plusHour(x.start));
+      if(x.skip){x.state='past';return}
+      const nx=items.slice(i+1).find(y=>!y.skip&&y.start>x.start),lim=x.end||(nx&&nx.start<plusHour(x.start)?nx.start:plusHour(x.start));
       x.state=hm<x.start?'next':hm<lim?'now':'past';
     });
   }else items.forEach(x=>x.state=d<today()?'past':'next');
   return items;
 }
 function agendaHTML(d){
-  return agenda(d).map(x=>`<div class="ag ${x.state} ${x.done?'done':''}">
+  return agenda(d,true).map(x=>x.skip?`<div class="ag skip">
+    <div class="agT">${esc(x.start)}${x.end?`<small>${esc(x.end)}</small>`:''}</div>
+    <div class="tb"><div class="tt">${esc(x.title)}</div><span class="chip">отменено на этот день</span></div>
+    <div class="ta show"><button class="btn sm" onclick="rxRestore('${d}','${x.id}')">Вернуть</button></div></div>`
+  :`<div class="ag ${x.state} ${x.done?'done':''}">
     <div class="agT">${esc(x.start)}${x.end?`<small>${esc(x.end)}</small>`:''}</div>
     <button class="chk" aria-label="${x.done?'Снять отметку':'Отметить сделанным'}" onclick="${x.kind==='r'?`toggleR('${x.id}','${d}')`:`toggleTask('${x.id}')`}">${ic('chk')}</button>
-    <div class="tb"><div class="tt">${esc(x.title)}</div>${x.state==='now'&&!x.done?'<span class="chip ok">сейчас</span> ':''}${x.kind==='t'?'<span class="chip">задача</span>':''}${x.note?`<div class="tn">${esc(x.note)}</div>`:''}</div>
-    <div class="ta"><button class="ib" title="Изменить" onclick="${x.kind==='r'?`openR('${x.id}',dow('${d}'))`:`openTask('${x.id}')`}">${ic('edit')}</button></div>
+    <div class="tb"><div class="tt">${esc(x.title)}</div>${x.state==='now'&&!x.done?'<span class="chip ok">сейчас</span> ':''}${x.kind==='t'?'<span class="chip">задача</span>':''}${x.changed?`<span class="chip rxc">вместо: ${esc(x.orig.title)}${x.orig.start!==x.start||(x.orig.end||'')!==x.end?' '+esc(x.orig.start)+(x.orig.end?'–'+esc(x.orig.end):''):''}</span>`:''}${x.added?'<span class="chip rxc">только сегодня</span>'.replace('сегодня',d===today()?'сегодня':'в этот день'):''}${x.note?`<div class="tn">${esc(x.note)}</div>`:''}</div>
+    <div class="ta"><button class="ib" title="Изменить" onclick="${x.kind==='r'?`openRX('${d}','${x.id}')`:`openTask('${x.id}')`}">${ic('edit')}</button></div>
   </div>`).join('');
 }
 function dayScheduleCard(){
-  const has=agenda(selDate).length;
-  return `<section class="card"><div class="listHead"><h2>График дня</h2><button class="btn sm" onclick="schedDay=dow(selDate);go('sched')">${has?'Изменить':'Настроить'}</button></div>
-    ${has?agendaHTML(selDate):'<p class="muted small" style="margin:6px 0 0">На этот день графика нет. Запишите распорядок — подъём, работа, спорт — и он будет появляться здесь каждый день.</p>'}</section>`;
+  const has=agenda(selDate,true).length;
+  return `<section class="card"><div class="listHead"><h2>График дня</h2><button class="btn sm" onclick="schedDay=dow(selDate);go('sched')">${has?'Весь график':'Настроить'}</button></div>
+    ${has?agendaHTML(selDate)+`<button class="rxAdd" onclick="openRX(selDate)">${ic('plus')}Добавить на ${selDate===today()?'сегодня':'этот день'}</button><p class="muted small" style="margin:10px 0 0">Планы поменялись? Нажмите на карандаш у пункта, чтобы заменить или отменить его только на этот день.</p>`:'<p class="muted small" style="margin:6px 0 0">На этот день графика нет. Запишите распорядок — подъём, работа, спорт — и он будет появляться здесь каждый день.</p>'}</section>`;
 }
+/* ---- изменения графика на конкретную дату ---- */
+let rxDate=null,rxRid=null;
+function openRX(d,id){
+  rxDate=d;rxRid=null;rxAddId=null;let it=null,base=null;
+  if(id){
+    const add=S.rx.find(x=>x.id===id&&x.kind==='add');
+    rxAddId=add?add.id:null;
+    if(add)it=add;else{base=S.routine.find(r=>r.id===id);rxRid=id;const o=S.rx.find(x=>x.date===d&&x.rid===id&&x.kind==='edit');it=o||base}
+  }
+  const dx=parse(d);
+  $('rxHead').textContent=id?'Изменить на '+(d===today()?'сегодня':dx.getDate()+' '+MON[dx.getMonth()]):'Добавить на '+(d===today()?'сегодня':dx.getDate()+' '+MON[dx.getMonth()]);
+  $('rxSub').textContent=base?'Обычно: '+base.title+', '+base.start+(base.end?'–'+base.end:'')+'. Изменение коснётся только этого дня, постоянный график останется прежним.':'Пункт появится только в этот день. Например: внеплановая встреча или подработка.';
+  $('rxTitle').value=it?it.title:'';$('rxStart').value=it?it.start:'';$('rxEnd').value=it?it.end||'':'';$('rxNote').value=it?it.note||'':'';
+  $('rxSkipB').classList.toggle('hide',!rxRid);$('rxDelB').classList.toggle('hide',!(id&&!rxRid));
+  $('rxResetB').classList.toggle('hide',!(rxRid&&S.rx.some(x=>x.date===d&&x.rid===rxRid)));
+  $('rxPermB').classList.toggle('hide',!rxRid);
+  $('dlgRX').showModal();setTimeout(()=>$('rxTitle').focus(),0);
+}
+function rxDrop(d,rid){S.rx=S.rx.filter(x=>!(x.date===d&&x.rid===rid))}
+function saveRX(){
+  const title=$('rxTitle').value.trim(),start=$('rxStart').value,end=$('rxEnd').value,note=$('rxNote').value.trim();
+  if(!title||!start)return;if(end&&end<=start){toast('Время окончания должно быть позже начала');return}
+  const before=JSON.stringify(S.rx);
+  if(rxRid){
+    const b=S.routine.find(r=>r.id===rxRid);rxDrop(rxDate,rxRid);
+    if(!(b&&b.title===title&&b.start===start&&(b.end||'')===end&&(b.note||'')===note))S.rx.push({id:'rx_'+rxDate+'_'+rxRid,date:rxDate,rid:rxRid,kind:'edit',title,start,end,note});
+  }else{
+    const ex=S.rx.find(x=>x.id===rxEditId());
+    if(ex)Object.assign(ex,{title,start,end,note});else S.rx.push({id:uid(),date:rxDate,kind:'add',title,start,end,note});
+  }
+  $('dlgRX').close();save();render();toast(rxRid?'Изменено только на этот день':'Добавлено на этот день',()=>{S.rx=JSON.parse(before)});
+}
+let rxAddId=null;const rxEditId=()=>rxAddId;
+function rxSkip(){
+  const before=JSON.stringify(S.rx);rxDrop(rxDate,rxRid);S.rx.push({id:'rx_'+rxDate+'_'+rxRid,date:rxDate,rid:rxRid,kind:'skip'});
+  $('dlgRX').close();save();render();toast('Отменено на этот день',()=>{S.rx=JSON.parse(before)});
+}
+function rxReset(){const before=JSON.stringify(S.rx);rxDrop(rxDate,rxRid);$('dlgRX').close();save();render();toast('Вернул как в постоянном графике',()=>{S.rx=JSON.parse(before)})}
+function rxRestore(d,rid){const before=JSON.stringify(S.rx);rxDrop(d,rid);save();render();toast('Пункт вернулся',()=>{S.rx=JSON.parse(before)})}
+function rxDelAdd(){const before=JSON.stringify(S.rx);S.rx=S.rx.filter(x=>x.id!==rxAddId);$('dlgRX').close();save();render();toast('Удалено',()=>{S.rx=JSON.parse(before)})}
 let editRDay=0;
 const DAYN=['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'],DAYN4=['в понедельник','во вторник','в среду','в четверг','в пятницу','в субботу','в воскресенье'];
 function openR(id,day){
@@ -1453,17 +1547,14 @@ function printOut(h){
 }
 
 /* ======================= Телеграм-бот ======================= */
-/* Бот работает на сервере (Cloudflare Worker asmo-bot): принимает сообщения через webhook и шлёт напоминания,
-   даже когда сайт закрыт. Сайт только подключает бота и хранит его настройки в Supabase (таблица planner_bot). */
-const BOT_URL='https://asmo-bot.sunnatbek-abdumuxtorov.workers.dev';
-const TGKEY='planner_tg_v1';   /* старое хранилище бота в браузере — используется только для переноса */
-const TG0={token:'',bot:'',chat:null,chatName:'',code:'',digest:true,digestTime:'09:00',remind:true,tz:''};
-let TG={...TG0},tgStatus='off',tgRun=0,tgAbort=null,tgPoll=null;
-const TGS={off:'Не подключён',load:'Загрузка…',pair:'Ждёт код привязки',on:'Работает круглосуточно',
-  offline:'Нет связи с сервером, повторю позже',badtoken:'Токен больше не подходит — подключите бота заново'};
-const devTz=()=>{try{return Intl.DateTimeFormat().resolvedOptions().timeZone||'Asia/Tashkent'}catch(e){return 'Asia/Tashkent'}};
-const rowToTg=r=>({token:r.token,bot:r.bot,chat:r.chat?Number(r.chat):null,chatName:r.chat_name||'',code:r.code||'',digest:r.digest,digestTime:r.digest_time||'09:00',remind:r.remind,tz:r.tz||''});
-function tgSave(){try{localStorage.removeItem(TGKEY)}catch(e){}}
+const TGKEY='planner_tg_v1';
+const TG0={token:'',bot:'',chat:null,chatName:'',code:'',offset:0,digest:true,digestTime:'09:00',remind:true,lastDigest:'',sent:{},cmdV:0};
+let TG={...TG0},tgStatus='off',tgAbort=null,tgRun=0;
+const TGS={off:'Не подключён',wait:'Бот работает в другой вкладке планировщика',pair:'Ждёт код привязки',on:'Работает',
+  offline:'Нет связи с Telegram, пробую снова',conflict:'Этот бот уже запущен где-то ещё (другой браузер или сервер)',badtoken:'Токен больше не подходит — подключите бота заново'};
+function tgLoad(){try{TG={...TG0,...JSON.parse(localStorage.getItem(TGKEY)||'{}')}}catch(e){}}
+function tgSave(){try{localStorage.setItem(TGKEY,JSON.stringify(TG))}catch(e){}}
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 function softRender(){const a=document.activeElement;if(a&&$('view').contains(a)&&/INPUT|TEXTAREA|SELECT/.test(a.tagName)){renderNav();return}render()}
 function setTg(s){if(s===tgStatus)return;tgStatus=s;if(view==='bot')softRender();else renderNav()}
 
@@ -1477,49 +1568,66 @@ async function tg(method,params={},signal){
 }
 const tgSend=(text,kb)=>tg('sendMessage',{chat_id:TG.chat,text,parse_mode:'HTML',disable_web_page_preview:true,reply_markup:kb?{inline_keyboard:kb}:undefined});
 const cut=(s,n)=>s.length>n?s.slice(0,n-1)+'…':s;
-const TG_CMDS=[['today','Задачи на сегодня'],['schedule','График дня'],['tomorrow','Задачи на завтра'],['week','Ближайшие 7 дней'],['overdue','Просроченные'],['plans','Планы'],['done','Выполнено сегодня'],['help','Что умеет бот']].map(([command,description])=>({command,description}));
 
-/* ---- настройки бота в Supabase ---- */
-async function botApi(method,body){
-  const path='/rest/v1/planner_bot'+(method==='GET'?'?select=*':method==='POST'?'?on_conflict=user_id':'?user_id=eq.'+AU.uid);
-  const r=await sb(path,{method,headers:method==='POST'?{'Prefer':'resolution=merge-duplicates,return=minimal'}:{},body:body?JSON.stringify(body):undefined});
-  if(!r.ok)throw new Error('bot '+r.status);
-  return method==='GET'?r.json():null;
-}
-const hookSecret=()=>[...crypto.getRandomValues(new Uint8Array(24))].map(b=>b.toString(16).padStart(2,'0')).join('');
-async function tgHook(secret){
-  await tg('setWebhook',{url:BOT_URL+'/hook/'+AU.uid,secret_token:secret,allowed_updates:['message','callback_query'],drop_pending_updates:false});
-}
-async function tgLoad(){
-  if(!AU){TG={...TG0};setTg('off');return}
+async function tgLoop(){
   const run=++tgRun;
-  try{
-    const rows=await botApi('GET');if(run!==tgRun)return;
-    if(rows[0]){TG=rowToTg(rows[0]);tgSave();setTg(TG.chat?'on':'pair')}
-    else{
-      TG={...TG0};
-      /* перенос бота, который раньше жил в браузере этого устройства */
-      let old=null;try{old=JSON.parse(localStorage.getItem(TGKEY)||'null')}catch(e){}
-      if(old&&old.token){
-        TG={...TG0,token:old.token,bot:old.bot||'',chat:old.chat||null,chatName:old.chatName||'',code:old.code||String(Math.floor(1000+Math.random()*9000)),
-          digest:old.digest!==false,digestTime:old.digestTime||'09:00',remind:old.remind!==false,tz:devTz()};
-        const secret=hookSecret();
-        await botApi('POST',{user_id:AU.uid,token:TG.token,bot:TG.bot,hook_secret:secret,code:TG.chat?null:TG.code,chat:TG.chat,chat_name:TG.chatName,
-          tz:TG.tz,digest:TG.digest,digest_time:TG.digestTime,remind:TG.remind,last_digest:today()});
-        await tgHook(secret);tgSave();toast('Бот перенесён на сервер — теперь он работает и при закрытом сайте');
+  if(!TG.token){setTg('off');return}
+  const body=async()=>{
+    tgLoad();let wait=1000;
+    if(TG.cmdV!==2)tg('setMyCommands',{commands:TG_CMDS}).then(()=>{TG.cmdV=2;tgSave()}).catch(()=>{});
+    while(run===tgRun&&TG.token){
+      try{
+        tgAbort=new AbortController();
+        const ups=await tg('getUpdates',{offset:TG.offset,timeout:25,allowed_updates:['message','callback_query']},tgAbort.signal);
+        if(run!==tgRun)return;
+        setTg(TG.chat?'on':'pair');wait=1000;
+        for(const u of ups){TG.offset=u.update_id+1;tgSave();try{await tgHandle(u)}catch(e){console.warn('tg',e)}}
+      }catch(e){
+        if(run!==tgRun)return;
+        if(e.code===401){setTg('badtoken');return}
+        setTg(e.code===409?'conflict':'offline');
+        await sleep(wait);wait=Math.min(wait*2,30000);
       }
-      setTg(TG.token?(TG.chat?'on':'pair'):'off');
     }
-  }catch(e){if(run===tgRun)setTg(e.code===401?'badtoken':'offline')}
-  tgPollUpd();
-}
-/* пока ждём привязки, проверяем, не прислал ли пользователь код боту */
-function tgPollUpd(){
-  const need=AU&&TG.token&&!TG.chat&&view==='bot';
-  if(need&&!tgPoll)tgPoll=setInterval(()=>{if(document.visibilityState==='visible')tgLoad()},4000);
-  if(!need&&tgPoll){clearInterval(tgPoll);tgPoll=null}
+  };
+  if(navigator.locks){setTg('wait');await navigator.locks.request('planner_tg_poll',body)}else await body();
 }
 
+const TG_CMDS=[['today','Задачи на сегодня'],['schedule','График дня'],['tomorrow','Задачи на завтра'],['week','Ближайшие 7 дней'],['overdue','Просроченные'],['plans','Планы'],['done','Выполнено сегодня'],['help','Что умеет бот']].map(([command,description])=>({command,description}));
+const TG_HELP=`Напишите мне задачу — добавлю её в планировщик на сегодня.
+
+<b>Примеры</b>
+• Позвонить поставщику
+• завтра 14:30 Созвон с командой
+• 20.11 Сдать отчёт
+• ! Подписать акт — с высокой важностью
+Вторая строка сообщения станет заметкой.
+
+<b>Команды</b>
+/today — задачи на сегодня
+/tomorrow — на завтра
+/week — ближайшие 7 дней
+/overdue — просроченные
+/plans — планы
+/done — выполнено сегодня
+/schedule — график дня`;
+
+function tgParse(text){
+  const lines=text.split('\n');let s=lines[0].trim(),date=today(),time='',prio=2,m;
+  if(/^!+/.test(s)){prio=1;s=s.replace(/^!+\s*/,'')}
+  if(m=s.match(/^(сегодня|завтра|послезавтра)[\s,:]+/i)){date=addDays(today(),{'сегодня':0,'завтра':1,'послезавтра':2}[m[1].toLowerCase()]);s=s.slice(m[0].length)}
+  else if(m=s.match(/^(\d{1,2})\.(\d{1,2})(?:\.(\d{4}))?[\s,:]+/)){
+    const dd=+m[1],mm=+m[2];let y=m[3]?+m[3]:new Date().getFullYear();
+    let d=new Date(y,mm-1,dd);
+    if(d.getMonth()===mm-1&&d.getDate()===dd){
+      if(!m[3]&&iso(d)<today())d=new Date(y+1,mm-1,dd);
+      date=iso(d);s=s.slice(m[0].length);
+    }
+  }
+  if(m=s.match(/^(?:в\s+)?([01]?\d|2[0-3]):([0-5]\d)[\s,]+/i)){time=m[1].padStart(2,'0')+':'+m[2];s=s.slice(m[0].length)}
+  if(/^!+/.test(s)){prio=1;s=s.replace(/^!+\s*/,'')}
+  return{title:s.trim(),date,time,prio,note:lines.slice(1).join(' ').trim()};
+}
 const tgTaskKb=t=>t.done?[[{text:'↩ Вернуть в работу',callback_data:'t|'+t.id+'|u'}]]
   :[[{text:'✓ Выполнено',callback_data:'t|'+t.id+'|d'},{text:'→ На завтра',callback_data:'t|'+t.id+'|m'}],[{text:'Удалить',callback_data:'t|'+t.id+'|x'}]];
 const tgWhen=t=>fmt(t.date)+(t.time?', '+t.time:'');
@@ -1538,42 +1646,125 @@ function tgList(key){
 }
 async function tgSendList(key){const l=tgList(key);await tgSend(l.text,l.kb)}
 
+async function tgHandle(u){
+  if(u.callback_query)return tgCallback(u.callback_query);
+  const m=u.message;if(!m||!m.text)return;
+  const chat=m.chat.id,text=m.text.trim();
+  if(!TG.chat){
+    if(m.chat.type==='private'&&text.replace(/^\/start\s*/,'')===TG.code){
+      TG.chat=chat;TG.chatName=[m.from.first_name,m.from.last_name].filter(Boolean).join(' ');tgSave();setTg('on');
+      toast('Телеграм-бот привязан');
+      await tgSend('Готово, бот привязан к вашему планировщику.\n\n'+TG_HELP);
+    }else await tg('sendMessage',{chat_id:chat,text:'Бот ещё не привязан. Откройте планировщик, раздел «Бот», и отправьте сюда код привязки.'});
+    return;
+  }
+  if(chat!==TG.chat){await tg('sendMessage',{chat_id:chat,text:'Это личный бот, он отвечает только владельцу.'});return}
+  const cmd=text.split(/\s+/)[0].toLowerCase().replace(/@.*$/,''),t=today();
+  if(cmd==='/start'||cmd==='/help')return tgSend(TG_HELP);
+  if(cmd==='/today'||/^сегодня$/i.test(text))return tgSendList(t);
+  if(cmd==='/tomorrow'||/^завтра$/i.test(text))return tgSendList(addDays(t,1));
+  if(cmd==='/schedule'||/^график$/i.test(text))return tgSend(tgAgenda(t)||'На сегодня графика нет. Его можно настроить в планировщике, в разделе «График».');
+  if(cmd==='/overdue')return tgSendList('od');
+  if(cmd==='/week'){
+    const out=[];for(let i=0;i<7;i++){const d=addDays(t,i),l=dayTasks(d).filter(x=>!x.done).sort(sortT);
+      if(l.length)out.push(`<b>${esc(fmtLong(d))}</b>\n`+l.map(x=>'▫️ '+(x.time?x.time+' ':'')+esc(x.title)+(x.prio===1?' ❗':'')).join('\n'))}
+    return tgSend(out.length?out.join('\n\n'):'На ближайшие 7 дней открытых задач нет.');
+  }
+  if(cmd==='/plans'){
+    return tgSend(S.plans.length?S.plans.map(p=>`<b>${esc(p.title)}</b> — ${planPct(p)}%\n`+p.steps.map(s=>(s.done?'✅ ':'▫️ ')+esc(s.text)).join('\n')).join('\n\n'):'Планов пока нет. Их можно создать в планировщике.');
+  }
+  if(cmd==='/done'){
+    const l=S.tasks.filter(x=>x.done&&(x.doneAt||x.date)===t);
+    return tgSend(l.length?'<b>Выполнено сегодня</b>\n\n'+l.map(x=>'✅ '+esc(x.title)).join('\n'):'Сегодня пока ничего не выполнено.');
+  }
+  if(cmd.startsWith('/'))return tgSend('Не знаю такой команды. Отправьте /help — покажу, что я умею.');
+  const p=tgParse(text);
+  if(!p.title)return tgSend('Не вижу текста задачи. Пример: «завтра 14:30 Созвон с командой».');
+  const task={id:uid(),done:false,created:Date.now(),...p};
+  S.tasks.push(task);save();softRender();toast('Новая задача из Telegram');
+  return tgSend(`Добавлено на ${esc(tgWhen(task))}:\n<b>${esc(task.title)}</b>`+(task.note?'\n'+esc(task.note):''),tgTaskKb(task));
+}
+
+async function tgCallback(q){
+  const ack=text=>tg('answerCallbackQuery',{callback_query_id:q.id,text}).catch(()=>{});
+  if(!q.message||q.message.chat.id!==TG.chat)return ack('Недоступно');
+  const [k,a,b]=String(q.data||'').split('|'),t=today();
+  const edit=(text,kb)=>tg('editMessageText',{chat_id:TG.chat,message_id:q.message.message_id,text,parse_mode:'HTML',reply_markup:{inline_keyboard:kb||[]}}).catch(()=>{});
+  if(k==='l'){
+    const x=S.tasks.find(y=>y.id===b);
+    if(x&&!x.done){x.done=true;x.doneAt=t;save();softRender()}
+    const l=tgList(a);await edit(l.text,l.kb);return ack(x?'Выполнено':'Задача уже удалена');
+  }
+  if(k==='t'){
+    const x=S.tasks.find(y=>y.id===a);
+    if(!x){await edit('Этой задачи уже нет в планировщике.');return ack('Задача не найдена')}
+    const name=`<b>${esc(x.title)}</b>`;
+    if(b==='d'){x.done=true;x.doneAt=t;save();softRender();await edit('✅ Выполнено: '+name,tgTaskKb(x));return ack('Выполнено')}
+    if(b==='u'){x.done=false;x.doneAt=null;save();softRender();await edit(`В работе, ${esc(tgWhen(x))}:\n`+name,tgTaskKb(x));return ack('Возвращено в работу')}
+    if(b==='m'){x.prevDate=x.date;x.date=addDays(x.date<t?t:x.date,1);save();softRender();
+      await edit(`Перенесено на ${esc(fmt(x.date))}:\n`+name,[[{text:'↩ Вернуть на '+fmt(x.prevDate),callback_data:'t|'+x.id+'|b'}],[{text:'✓ Выполнено',callback_data:'t|'+x.id+'|d'}]]);return ack('Перенесено')}
+    if(b==='b'){if(x.prevDate){const d=x.date;x.date=x.prevDate;x.prevDate=d}save();softRender();await edit(`Возвращено на ${esc(tgWhen(x))}:\n`+name,tgTaskKb(x));return ack('Возвращено')}
+    if(b==='x'){S.tasks=S.tasks.filter(y=>y.id!==a);save();softRender();await edit('Удалено: '+esc(x.title));return ack('Удалено')}
+  }
+  return ack();
+}
+
+/* утренняя сводка и напоминания — отправляет только вкладка, которая ведёт бота */
+async function tgTick(){
+  if(tgStatus!=='on'||!TG.chat)return;
+  const n=new Date(),t=today(),mins=n.getHours()*60+n.getMinutes(),hm=String(n.getHours()).padStart(2,'0')+':'+String(n.getMinutes()).padStart(2,'0');
+  try{
+    if(TG.digest&&TG.lastDigest!==t&&hm>=TG.digestTime){
+      TG.lastDigest=t;tgSave();
+      const l=tgList(t),od=S.tasks.filter(x=>!x.done&&x.date<t).length;
+      await tgSend('Доброе утро! План на день.\n\n'+(tgAgenda(t)?tgAgenda(t)+'\n\n':'')+l.text+(od?`\n\nПросроченных задач: ${od}. Посмотреть: /overdue`:''),l.kb);
+    }
+    if(TG.remind){
+      for(const x of dayTasks(t)){
+        if(x.done||!x.time)continue;
+        const key=x.id+'|'+x.date+'|'+x.time,[h,m]=x.time.split(':').map(Number),diff=mins-(h*60+m);
+        if(diff<0||TG.sent[key])continue;
+        TG.sent[key]=1;tgSave();
+        if(diff<=30)await tgSend(`⏰ ${esc(x.time)} — <b>${esc(x.title)}</b>`+(x.note?'\n'+esc(x.note):''),tgTaskKb(x));
+      }
+      for(const r of dayRoutine(t)){
+        const key='r:'+r.id+'|'+t+'|'+r.start,[h,m]=r.start.split(':').map(Number),diff=mins-(h*60+m);
+        if(diff<0||TG.sent[key])continue;
+        TG.sent[key]=1;tgSave();
+        if(diff<=30&&!rIsDone(r.id,t))await tgSend(`🕒 ${esc(r.start)}${r.end?'–'+esc(r.end):''} по графику: <b>${esc(r.title)}</b>`+(r.note?'\n'+esc(r.note):''));
+      }
+      let ch=false;for(const k in TG.sent)if(!k.includes('|'+t+'|')){delete TG.sent[k];ch=true}
+      if(ch)tgSave();
+    }
+  }catch(e){console.warn('tg tick',e)}
+}
+
 async function tgConnect(){
   const token=$('tgToken').value.trim();
   if(!/^\d+:[\w-]{30,}$/.test(token)){toast('Это не похоже на токен. Он выглядит так: 123456789:AAH…');return}
-  if(!AU){toast('Сначала войдите в аккаунт');return}
-  $('tgBtn').disabled=true;const prev=TG;TG={...TG0,token};
+  $('tgBtn').disabled=true;TG={...TG0,token};
   try{
     const me=await tg('getMe');
+    await tg('deleteWebhook').catch(()=>{});
     await tg('setMyCommands',{commands:TG_CMDS}).catch(()=>{});
-    const secret=hookSecret(),code=String(Math.floor(1000+Math.random()*9000)),tz=devTz();
-    await botApi('POST',{user_id:AU.uid,token,bot:me.username,hook_secret:secret,code,chat:null,chat_name:'',tz,digest:true,digest_time:'09:00',remind:true,last_digest:today(),sent:{}});
-    await tgHook(secret);
-    TG={...TG0,token,bot:me.username,code,tz};tgSave();setTg('pair');
-    toast('Бот @'+me.username+' подключён');render();tgPollUpd();
+    TG.bot=me.username;TG.cmdV=2;TG.code=String(Math.floor(1000+Math.random()*9000));TG.lastDigest=today();
+    tgSave();toast('Бот @'+me.username+' подключён');render();tgLoop();
   }catch(e){
-    TG=prev;render();
-    toast(e.code===401||e.code===404?'Токен не подходит. Скопируйте его из BotFather целиком.':'Не удалось подключить бота. Проверьте интернет и попробуйте ещё раз.');
+    TG={...TG0};tgSave();render();
+    toast(e.code===401||e.code===404?'Токен не подходит. Скопируйте его из BotFather целиком.':'Не удалось связаться с Telegram. Проверьте интернет.');
   }
 }
-async function tgDisconnect(){
+function tgDisconnect(){
   if(!confirm('Отключить бота от планировщика? Задачи останутся на месте.'))return;
-  try{await tg('deleteWebhook').catch(()=>{});await botApi('DELETE')}
-  catch(e){toast('Не удалось отключить. Проверьте интернет.');return}
-  tgRun++;TG={...TG0};tgSave();tgStatus='off';tgPollUpd();render();toast('Бот отключён');
+  tgRun++;if(tgAbort)tgAbort.abort();TG={...TG0};tgSave();tgStatus='off';render();toast('Бот отключён');
 }
-const TGCOL={digest:'digest',digestTime:'digest_time',remind:'remind'};
-async function tgSet(k,v){
-  TG[k]=v;
-  try{await botApi('PATCH',{[TGCOL[k]]:v,updated_at:new Date().toISOString()});toast('Сохранено')}
-  catch(e){toast('Не удалось сохранить настройку. Проверьте интернет.')}
-}
+function tgSet(k,v){TG[k]=v;tgSave()}
 async function tgSendNow(){try{await tgSendList(today());toast('Список отправлен в Telegram')}catch(e){toast('Не удалось отправить. Проверьте интернет.')}}
 
 function viewBot(){
   const how=`<section class="card"><h2>Как это работает</h2>
-    <p class="muted" style="margin:0 0 8px">Бот работает на сервере круглосуточно. Сайт можно закрыть — бот всё равно ответит, добавит задачу и напомнит о деле.</p>
-    <p class="muted" style="margin:0">Задачи из Telegram появляются в планировщике на всех устройствах, где вы вошли в аккаунт.</p></section>`;
+    <p class="muted" style="margin:0 0 8px">Бот живёт прямо в этой странице, поэтому хостинг не нужен. Пока планировщик открыт во вкладке браузера, бот отвечает сразу.</p>
+    <p class="muted" style="margin:0">Если страница закрыта, сообщения не теряются: Telegram хранит их до 24 часов, и бот обработает всё, как только вы откроете планировщик.</p></section>`;
   if(!TG.token)return `<div class="stack" style="max-width:640px">
     <section class="card"><h2>Подключение за две минуты</h2>
       <ol class="steps"><li>Откройте в Telegram <a href="https://t.me/BotFather" target="_blank" rel="noopener">@BotFather</a> и отправьте ему <b>/newbot</b>.</li>
@@ -1581,8 +1772,9 @@ function viewBot(){
       <li>BotFather пришлёт токен — длинную строку с двоеточием. Вставьте её сюда.</li></ol>
       <div class="row" style="flex-wrap:nowrap"><input type="text" id="tgToken" placeholder="123456789:AAH…" autocomplete="off" aria-label="Токен бота" onkeydown="if(event.key==='Enter')tgConnect()">
       <button class="btn pri" id="tgBtn" onclick="tgConnect()">Подключить</button></div>
-      <p class="muted small" style="margin:10px 0 0">Токен хранится в вашем аккаунте и нужен серверу, чтобы бот работал, когда сайт закрыт. Подключать бота нужно один раз — на любом устройстве.</p></section>${how}</div>`;
-  const st=`<div class="tgst ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='load'?'':'bad'}"><i></i><span>${TGS[tgStatus]}</span></div>`;
+      <p class="muted small" style="margin:10px 0 0">Токен хранится только в этом браузере и не попадает в резервную копию.</p>
+      <p class="muted small" style="margin:6px 0 0">Подключайте бота только на одном устройстве, например на компьютере. Задачи из Telegram появятся и на остальных устройствах, где вы вошли в аккаунт.</p></section>${how}</div>`;
+  const st=`<div class="tgst ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"><i></i><span>${TGS[tgStatus]}</span></div>`;
   if(!TG.chat)return `<div class="stack" style="max-width:640px">
     <section class="card"><h2>Остался один шаг</h2>${st}
       <p style="margin:12px 0">Бот <b>@${esc(TG.bot)}</b> подключён. Теперь покажите ему, что вы владелец: откройте бота и нажмите «Начать».</p>
@@ -1599,7 +1791,7 @@ function viewBot(){
       <label class="opt"><input type="checkbox" ${TG.digest?'checked':''} onchange="tgSet('digest',this.checked)"><span>Утренняя сводка с планом на день</span>
         <input type="time" value="${TG.digestTime}" onchange="tgSet('digestTime',this.value||'09:00')" aria-label="Время сводки"></label>
       <label class="opt"><input type="checkbox" ${TG.remind?'checked':''} onchange="tgSet('remind',this.checked)"><span>Напоминать о задачах со временем и о пунктах графика</span></label>
-      <p class="muted small" style="margin:8px 0 0">Уведомления приходят, даже когда сайт закрыт. Время считается по часовому поясу ${esc(TG.tz||devTz())}.</p></section>
+      <p class="muted small" style="margin:8px 0 0">Уведомления приходят, когда планировщик открыт в браузере.</p></section>
     <section class="card"><h2>Что писать боту</h2>
       <div class="ex"><b>Позвонить поставщику</b><span>задача на сегодня</span></div>
       <div class="ex"><b>завтра 14:30 Созвон с командой</b><span>на завтра, со временем</span></div>
@@ -1610,8 +1802,9 @@ function viewBot(){
       <div class="ex"><b>/overdue, /plans, /done</b><span>просроченные, планы, готовое</span></div></section>${how}</div>`;
 }
 window.addEventListener('storage',e=>{
-  if(e.key===KEY&&e.newValue){try{const o=JSON.parse(e.newValue);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.exp=o.exp||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};snap()}catch(_){}softRender()}
+  if(e.key===KEY&&e.newValue){try{const o=JSON.parse(e.newValue);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.exp=o.exp||[];S.rx=o.rx||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};snap()}catch(_){}softRender()}
   if(e.key===AUKEY){const was=AU&&AU.uid;auLoad();auGate();if((AU&&AU.uid)!==was){try{const o=JSON.parse(localStorage.getItem(KEY)||'{}');S={...S,...dataOf(o)};snap()}catch(_){}render();if(AU)syRun()}}
+  if(e.key===TGKEY){tgLoad();if(!TG.token){tgRun++;if(tgAbort)tgAbort.abort();tgStatus='off'}else if(tgStatus==='off')tgLoop();softRender()}
 });
 
 
@@ -1696,8 +1889,8 @@ function render(){
   $('view').innerHTML=view==='day'?viewDay():view==='plans'?viewPlans():view==='sched'?viewSched():view==='done'?viewDone():view==='exp'?viewExp():view==='bot'?viewBot():viewData();
   if(view==='done')renderDoneList();
 }
-['dlgTask','dlgPlan','dlgExport','dlgMove','dlgR','dlgExp'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target.id===id)e.target.close()}));
-syLoad();auLoad();load();save();render();auGate();auMode();auFromLink();syRun();tgLoad();
+['dlgTask','dlgPlan','dlgExport','dlgMove','dlgR','dlgExp','dlgRX'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target.id===id)e.target.close()}));
+syLoad();auLoad();load();tgLoad();save();render();auGate();auMode();auFromLink();tgLoop();syRun();setInterval(tgTick,30000);setTimeout(tgTick,4000);
 
 /* ======== свои выпадающие списки ======== */
 (function(){
