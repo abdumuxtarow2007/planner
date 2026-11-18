@@ -7,6 +7,9 @@ export default {
     const url = new URL(req.url);
     const m = url.pathname.match(/^\/hook\/([0-9a-f-]{36})$/i);
     if (m && req.method === 'POST') return hook(req, env, m[1]);
+    if (url.pathname === '/hook' && req.method === 'POST') return sharedHook(req, env);
+    if (url.pathname === '/info') return new Response(JSON.stringify({ shared: !!(env.BOT_TOKEN && env.HOOK_SECRET), bot: env.BOT_USERNAME || '' }), { headers: { 'content-type': 'application/json', 'access-control-allow-origin': '*', 'cache-control': 'no-store' } });
+    if (url.pathname === '/setup') return setup(url, env);
     if (url.pathname === '/health') {
       try { await sb(env, 'planner_bot?select=user_id&limit=1'); return new Response('supabase: ok'); }
       catch (e) { return new Response('supabase: ' + String(e && e.message).slice(0, 300), { status: 500 }); }
@@ -35,7 +38,7 @@ const getBot = async (env, uid) => (await sb(env, `planner_bot?user_id=eq.${uid}
 const patchBot = (env, uid, body) =>
   sb(env, `planner_bot?user_id=eq.${uid}`, { method: 'PATCH', body: JSON.stringify({ ...body, updated_at: new Date().toISOString() }) });
 
-const dataOf = o => ({ tasks: o.tasks || [], plans: o.plans || [], routine: o.routine || [], exp: o.exp || [], rdone: o.rdone || {}, del: o.del || {}, rdu: o.rdu || {} });
+const dataOf = o => ({ tasks: o.tasks || [], plans: o.plans || [], routine: o.routine || [], exp: o.exp || [], rx: o.rx || [], rdone: o.rdone || {}, del: o.del || {}, rdu: o.rdu || {} });
 async function loadData(env, uid) {
   const row = (await sb(env, `planner_data?user_id=eq.${uid}&select=data,updated_at`))[0];
   return { data: dataOf((row && row.data) || {}), at: row ? row.updated_at : null, raw: row ? row.data || {} : null };
@@ -117,7 +120,7 @@ function makeCtx(env, bot) {
   const c = {
     env, bot, uid: bot.user_id, t: n.date, year: n.year, mins: n.mins, hm: n.hm,
     fmt: s => { const d = parse(s); return d.getUTCDate() + ' ' + MON[d.getUTCMonth()] + (d.getUTCFullYear() !== n.year ? ' ' + d.getUTCFullYear() : ''); },
-    send: (text, kb) => tg(bot.token, 'sendMessage', { chat_id: bot.chat, text, parse_mode: 'HTML', disable_web_page_preview: true, ...(kb ? { reply_markup: { inline_keyboard: kb } } : {}) }),
+    send: (text, kb) => tg(tok(env, bot), 'sendMessage', { chat_id: bot.chat, text, parse_mode: 'HTML', disable_web_page_preview: true, ...(kb ? { reply_markup: { inline_keyboard: kb } } : {}) }),
   };
   c.fmtLong = s => WDF[parse(s).getUTCDay()] + ', ' + c.fmt(s);
   c.when = x => c.fmt(x.date) + (x.time ? ', ' + x.time : '');
@@ -126,7 +129,17 @@ function makeCtx(env, bot) {
 
 const sortT = (a, b) => (a.done - b.done) || ((a.time || '99:99').localeCompare(b.time || '99:99')) || (a.prio - b.prio) || ((a.created || 0) - (b.created || 0));
 const dayTasks = (D, d) => D.tasks.filter(t => t.date === d);
-const dayRoutine = (D, d) => D.routine.filter(r => (r.days || []).includes(dow(d))).sort((a, b) => a.start.localeCompare(b.start));
+const dayRoutine = (D, d) => {
+  const ov = (D.rx || []).filter(x => x.date === d), out = [];
+  for (const r of D.routine) {
+    if (!(r.days || []).includes(dow(d))) continue;
+    const o = ov.find(x => x.rid === r.id);
+    if (o && o.kind === 'skip') continue;
+    out.push(o && o.kind === 'edit' ? { ...r, title: o.title, start: o.start, end: o.end || '', note: o.note || '' } : r);
+  }
+  ov.filter(x => x.kind === 'add').forEach(x => out.push({ id: x.id, title: x.title, start: x.start, end: x.end || '', note: x.note || '' }));
+  return out.sort((a, b) => a.start.localeCompare(b.start));
+};
 const rIsDone = (D, id, d) => (D.rdone[d] || []).includes(id);
 const planPct = p => (p.steps.length ? Math.round(p.steps.filter(s => s.done).length / p.steps.length * 100) : 0);
 
@@ -192,6 +205,58 @@ async function hook(req, env, userId) {
   return new Response('ok');
 }
 
+/* ---------------- общий бот: один бот на всех пользователей ----------------
+   Токен общего бота лежит в секрете BOT_TOKEN. Пользователь привязывает свой Telegram одноразовым кодом
+   (ссылка t.me/<бот>?start=<код>), строка planner_bot у него остаётся без собственного токена (token = ''). */
+const tok = (env, bot) => bot.token || env.BOT_TOKEN;
+
+async function sharedHook(req, env) {
+  if (!env.BOT_TOKEN || !env.HOOK_SECRET || req.headers.get('X-Telegram-Bot-Api-Secret-Token') !== env.HOOK_SECRET) return new Response('forbidden', { status: 403 });
+  const u = await req.json().catch(() => null);
+  if (!u) return new Response('ok');
+  try {
+    const m = u.message, q = u.callback_query;
+    const chat = m ? m.chat.id : (q && q.message ? q.message.chat.id : null);
+    if (chat === null) return new Response('ok');
+    const rows = await sb(env, 'planner_bot?chat=eq.' + chat + '&token=eq.&select=*');
+    const bot = rows && rows[0];
+    if (bot) {
+      if (q) await onCallback(env, bot, q);
+      else if (m.text) await onMessage(env, bot, m);
+    } else if (m && m.text) await linkChat(env, m);
+    else if (q) await tg(env.BOT_TOKEN, 'answerCallbackQuery', { callback_query_id: q.id, text: 'Недоступно' }).catch(() => {});
+  } catch (e) { console.error('sharedHook', e && e.stack || e); }
+  return new Response('ok');
+}
+
+async function linkChat(env, m) {
+  const say = text => tg(env.BOT_TOKEN, 'sendMessage', { chat_id: m.chat.id, text, parse_mode: 'HTML', disable_web_page_preview: true });
+  const code = m.text.trim().replace(/^\/start\s*/i, '').trim();
+  if (m.chat.type !== 'private' || !/^[A-Za-z0-9_-]{6,32}$/.test(code)) {
+    return say('Я личный помощник планировщика ASMO. Откройте планировщик, раздел «Бот», нажмите «Подключить Telegram» и вернитесь сюда по кнопке.');
+  }
+  const rows = await sb(env, 'planner_bot?code=eq.' + encodeURIComponent(code) + '&chat=is.null&token=eq.&select=user_id');
+  if (!rows || !rows[0]) return say('Этот код не подошёл или уже использован. Откройте раздел «Бот» в планировщике и получите новый.');
+  const name = [m.from.first_name, m.from.last_name].filter(Boolean).join(' ');
+  await patchBot(env, rows[0].user_id, { chat: m.chat.id, chat_name: name, code: null });
+  await say('Готово, Telegram привязан к вашему планировщику.\n\n' + HELP);
+}
+
+/* Одноразовая настройка: откройте /setup?key=<HOOK_SECRET> — бот сам зарегистрирует webhook и команды */
+async function setup(url, env) {
+  if (!env.BOT_TOKEN || !env.HOOK_SECRET || url.searchParams.get('key') !== env.HOOK_SECRET) return new Response('forbidden', { status: 403 });
+  try {
+    const me = await tg(env.BOT_TOKEN, 'getMe');
+    await tg(env.BOT_TOKEN, 'setWebhook', { url: url.origin + '/hook', secret_token: env.HOOK_SECRET, allowed_updates: ['message', 'callback_query'] });
+    await tg(env.BOT_TOKEN, 'setMyCommands', { commands: [
+      ['today', 'Задачи на сегодня'], ['schedule', 'График дня'], ['tomorrow', 'Задачи на завтра'], ['week', 'Ближайшие 7 дней'],
+      ['overdue', 'Просроченные'], ['plans', 'Планы'], ['done', 'Выполнено сегодня'], ['help', 'Что умеет бот'],
+    ].map(([command, description]) => ({ command, description })) });
+    const hint = env.BOT_USERNAME === me.username ? '' : '\nЗадайте переменную BOT_USERNAME = ' + me.username;
+    return new Response('ok: @' + me.username + hint, { headers: { 'content-type': 'text/plain; charset=utf-8' } });
+  } catch (e) { return new Response('error: ' + e.message, { status: 500 }); }
+}
+
 async function onMessage(env, bot, m) {
   const chat = m.chat.id, text = m.text.trim();
   if (!bot.chat) {
@@ -201,11 +266,11 @@ async function onMessage(env, bot, m) {
       bot.chat = chat;
       await makeCtx(env, bot).send('Готово, бот привязан к вашему планировщику.\n\n' + HELP);
     } else {
-      await tg(bot.token, 'sendMessage', { chat_id: chat, text: 'Бот ещё не привязан. Откройте планировщик, раздел «Бот», и отправьте сюда код привязки.' });
+      await tg(tok(env, bot), 'sendMessage', { chat_id: chat, text: 'Бот ещё не привязан. Откройте планировщик, раздел «Бот», и отправьте сюда код привязки.' });
     }
     return;
   }
-  if (chat !== Number(bot.chat)) { await tg(bot.token, 'sendMessage', { chat_id: chat, text: 'Это личный бот, он отвечает только владельцу.' }); return; }
+  if (chat !== Number(bot.chat)) { await tg(tok(env, bot), 'sendMessage', { chat_id: chat, text: 'Это личный бот, он отвечает только владельцу.' }); return; }
 
   const c = makeCtx(env, bot), t = c.t;
   const cmd = text.split(/\s+/)[0].toLowerCase().replace(/@.*$/, '');
@@ -243,11 +308,11 @@ async function onMessage(env, bot, m) {
 }
 
 async function onCallback(env, bot, q) {
-  const ack = text => tg(bot.token, 'answerCallbackQuery', { callback_query_id: q.id, ...(text ? { text } : {}) }).catch(() => {});
+  const ack = text => tg(tok(env, bot), 'answerCallbackQuery', { callback_query_id: q.id, ...(text ? { text } : {}) }).catch(() => {});
   if (!q.message || q.message.chat.id !== Number(bot.chat)) return ack('Недоступно');
   const c = makeCtx(env, bot), t = c.t;
   const [k, a, b] = String(q.data || '').split('|');
-  const edit = (text, kb) => tg(bot.token, 'editMessageText', { chat_id: bot.chat, message_id: q.message.message_id, text, parse_mode: 'HTML', reply_markup: { inline_keyboard: kb || [] } }).catch(() => {});
+  const edit = (text, kb) => tg(tok(env, bot), 'editMessageText', { chat_id: bot.chat, message_id: q.message.message_id, text, parse_mode: 'HTML', reply_markup: { inline_keyboard: kb || [] } }).catch(() => {});
 
   if (k === 'l') {
     let found = false, D;
