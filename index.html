@@ -534,7 +534,7 @@ body{background:var(--ground);color:var(--ink)}
       <label><input type="radio" name="aumode" value="up" onchange="auMode()"><span>Регистрация</span></label>
     </div>
     <label class="f" id="auEmailW">Электронная почта<input type="email" id="auEmail" autocomplete="email"></label>
-    <label class="f" id="auCodeW">Код из письма<input type="text" id="auCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456"></label>
+    <label class="f" id="auCodeW">Код из письма<input type="text" id="auCode" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123-456" oninput="auCodeFmt(this)"></label>
     <label class="f" id="auPassW"><span id="auPassL">Пароль</span><input type="password" id="auPass" autocomplete="current-password"></label>
     <p class="auErr" id="auErr" role="alert"></p>
     <button class="btn pri" id="auBtn" type="submit">Войти</button>
@@ -1265,13 +1265,15 @@ async function auCall(path,body,token){
     throw {text:hit?hit[1]:'Не получилось'+(m.trim()?': '+m.trim():'. Попробуйте ещё раз.'),raw:m}}
   return j;
 }
+/* код из письма: 6 цифр, показываем как 123-456 (тире ставится само, вставка «123 456» или «123456» тоже подойдёт) */
+function auCodeFmt(el){const d=el.value.replace(/\D/g,'').slice(0,6);el.value=d.length>3?d.slice(0,3)+'-'+d.slice(3):d}
 async function auSubmit(){
   const email=(auStep?auStep.email:$('auEmail').value.trim()).toLowerCase(),password=$('auPass').value;
   $('auBtn').disabled=true;auMsg('');
   try{
     if(auStep){
-      const code=$('auCode').value.replace(/\s/g,''),rec=auStep.type==='recovery';
-      if(code.length<6){auMsg('Введите код из письма.');return}
+      const code=$('auCode').value.replace(/\D/g,''),rec=auStep.type==='recovery';
+      if(code.length!==6){auMsg('Введите 6 цифр кода из письма.');return}
       if(rec&&password.length<6){auMsg('Новый пароль должен быть не короче 6 символов.');return}
       const j=await auCall('/auth/v1/verify',{type:rec?'recovery':'signup',email,token:code});
       if(rec)await auCall('/auth/v1/user',{password},j.access_token);
