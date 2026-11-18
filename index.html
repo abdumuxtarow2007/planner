@@ -322,6 +322,7 @@ body.locked .app{display:none}
 .aBrand b{font:700 22px var(--sans);letter-spacing:-.02em}
 .seg.au2{grid-template-columns:1fr 1fr}
 .authCard .btn.pri{width:100%;justify-content:center;padding:12px}
+.auHint{margin:-4px 0 0;padding:10px 12px;border-radius:10px;background:#fff7e6;color:#7a5200;font-size:13.5px;line-height:1.4}
 .auErr{margin:0;color:var(--pome);font-size:14px;font-weight:600;min-height:0}
 .auErr:empty{display:none}
 .auErr.ok{color:#065f3b}
@@ -535,6 +536,7 @@ body{background:var(--ground);color:var(--ink)}
     </div>
     <label class="f" id="auEmailW">Электронная почта<input type="email" id="auEmail" autocomplete="email"></label>
     <label class="f" id="auCodeW">Код из письма<input type="text" id="auCode" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="123-456" oninput="auCodeFmt(this)"></label>
+    <p class="auHint hide" id="auHint">Нет письма? Загляните в папку «Спам» и нажмите «Не спам» — тогда следующие письма будут приходить во «Входящие».</p>
     <label class="f" id="auPassW"><span id="auPassL">Пароль</span><input type="password" id="auPass" autocomplete="current-password"></label>
     <p class="auErr" id="auErr" role="alert"></p>
     <button class="btn pri" id="auBtn" type="submit">Войти</button>
@@ -1244,11 +1246,11 @@ const auUp=()=>document.querySelector('input[name=aumode]:checked').value==='up'
 function auMsg(t,ok){const e=$('auErr');e.textContent=t||'';e.classList.toggle('ok',!!ok)}
 function auMode(){
   const up=auUp(),c=auStep,rec=c&&c.type==='recovery';
-  $('auTabs').classList.toggle('hide',!!c);$('auEmailW').classList.toggle('hide',!!c);$('auCodeW').classList.toggle('hide',!c);
+  $('auTabs').classList.toggle('hide',!!c);$('auEmailW').classList.toggle('hide',!!c);$('auCodeW').classList.toggle('hide',!c);$('auHint').classList.toggle('hide',!c);
   $('auPassW').classList.toggle('hide',!!c&&!rec);$('auPassL').textContent=rec?'Новый пароль':'Пароль';
   $('auForgotB').classList.toggle('hide',!!c||up);$('auResendB').classList.toggle('hide',!c);$('auBackB').classList.toggle('hide',!c);
   $('auBtn').textContent=c?(rec?'Сменить пароль и войти':'Подтвердить'):up?'Создать аккаунт':'Войти';
-  $('auLead').textContent=c?`Мы отправили письмо с кодом на ${c.email}. Введите код${rec?' и новый пароль':''}. Письмо может попасть в «Спам».`
+  $('auLead').textContent=c?`Мы отправили письмо с кодом на ${c.email}. Введите код${rec?' и новый пароль':''}.`
     :up?'Создайте аккаунт — задачи будут доступны с любого устройства.':'Войдите, чтобы открыть свои задачи на этом устройстве.';
   $('auPass').autocomplete=up||rec?'new-password':'current-password';auMsg('');
   if(c){$('auCode').value='';if(rec)$('auPass').value='';$('auCode').focus()}
