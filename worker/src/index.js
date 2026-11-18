@@ -7,6 +7,10 @@ export default {
     const url = new URL(req.url);
     const m = url.pathname.match(/^\/hook\/([0-9a-f-]{36})$/i);
     if (m && req.method === 'POST') return hook(req, env, m[1]);
+    if (url.pathname === '/health') {
+      try { await sb(env, 'planner_bot?select=user_id&limit=1'); return new Response('supabase: ok'); }
+      catch (e) { return new Response('supabase: ' + String(e && e.message).slice(0, 300), { status: 500 }); }
+    }
     return new Response('ASMO bot: ok', { headers: { 'content-type': 'text/plain; charset=utf-8' } });
   },
   async scheduled(event, env, ctx) {
@@ -174,8 +178,10 @@ function parseTask(c, text) {
 
 /* ---------------- webhook ---------------- */
 async function hook(req, env, userId) {
-  const bot = await getBot(env, userId).catch(() => null);
-  if (!bot || req.headers.get('X-Telegram-Bot-Api-Secret-Token') !== bot.hook_secret) return new Response('forbidden', { status: 403 });
+  let bot;
+  try { bot = await getBot(env, userId); }
+  catch (e) { console.error('getBot', e && e.message); return new Response('db error', { status: 500 }); }
+  if (!bot ||req.headers.get('X-Telegram-Bot-Api-Secret-Token') !== bot.hook_secret) return new Response('forbidden', { status: 403 });
   const u = await req.json().catch(() => null);
   if (u) {
     try {
