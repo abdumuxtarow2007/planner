@@ -523,6 +523,21 @@ body{background:var(--ground);color:var(--ink)}
 .rxAdd:hover{border-color:var(--acc);color:var(--acc);background:#f3f7f4}
 .linkBtn{background:none;border:0;font:inherit;font-size:14px;font-weight:600;color:var(--acc);cursor:pointer;padding:6px 4px;margin-left:auto}
 .linkBtn:hover{text-decoration:underline}
+
+/* ---------- финансы: доходы и расходы ---------- */
+.fSeg{display:grid;grid-template-columns:1fr 1fr;gap:4px;background:#eef1ee;border-radius:14px;padding:4px}
+.fSeg button{border:0;background:none;font:inherit;font-weight:700;font-size:15px;padding:10px;border-radius:11px;color:var(--muted);cursor:pointer;transition:background .12s,color .12s}
+.fSeg button.on{background:#fff;color:var(--ink);box-shadow:0 1px 3px rgba(10,16,32,.12)}
+.fSeg button.on.inc{color:#2a7d56}
+.fRow{display:grid;grid-template-columns:170px 1fr auto;gap:10px;align-items:center}
+.fRow>*{min-width:0}
+.fHint{margin:14px 0 0;font-size:14px;color:var(--muted)}.fHint b{color:var(--ink)}
+.fTabs{display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+.fDay{display:flex;justify-content:space-between;gap:10px;font-size:13px;font-weight:700;color:var(--muted);padding:14px 8px 4px}
+.fDay:first-of-type{padding-top:2px}
+.xSum.inc{color:#2a7d56}
+.xWrap .stat b.pos{color:#2a7d56}.xWrap .stat b.neg{color:var(--pome)}
+@media (max-width:760px){.fRow{grid-template-columns:1fr}.fRow .btn{width:100%;justify-content:center}.xWrap .stat b{font-size:16px}}
 </style>
 </head>
 <body>
@@ -704,7 +719,7 @@ body{background:var(--ground);color:var(--ink)}
 <!-- Расход -->
 <dialog id="dlgExp">
   <form onsubmit="event.preventDefault();saveExpDlg()">
-    <h2>Изменить расход</h2>
+    <h2 id="xeHead">Изменить расход</h2>
     <div class="fg">
       <label class="f">Сумма, сум<input type="text" id="xeAmt" inputmode="numeric" autocomplete="off" required oninput="expFmtIn(this)"></label>
       <label class="f">Категория<select id="xeCat"></select></label>
@@ -826,7 +841,7 @@ function toast(m,undo){
 function go(v){view=v;render();window.scrollTo(0,0);if(v==='bot'&&AU)tgLoad();else tgPollUpd()}
 function renderNav(){
   const t=today(),open=S.tasks.filter(x=>!x.done&&x.date===t).length,od=S.tasks.filter(x=>!x.done&&x.date<t).length;
-  const items=[['day','cal','День',od?`<span class="badge red">${od}</span>`:(open?`<span class="badge">${open}</span>`:'')],['sched','clock','График',''],['plans','plans','Планы',''],['done','done','Готово',''],['exp','wallet','Расходы',''],['bot','send','Бот',TG.token?`<span class="dot ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"></span>`:''],['data','data','Данные','']];
+  const items=[['day','cal','День',od?`<span class="badge red">${od}</span>`:(open?`<span class="badge">${open}</span>`:'')],['sched','clock','График',''],['plans','plans','Планы',''],['done','done','Готово',''],['exp','wallet','Финансы',''],['bot','send','Бот',TG.token?`<span class="dot ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"></span>`:''],['data','data','Данные','']];
   $('nav').innerHTML=items.map(([k,i,l,b])=>`<button class="${view===k?'on':''}" onclick="go('${k}')">${ic(i)}<span>${l}</span>${b}</button>`).join('');
 }
 
@@ -1743,73 +1758,102 @@ let editExp=null;
 const money=n=>Math.round(n).toLocaleString('ru-RU').replace(/\u00a0|\u202f/g,' ');
 const expNum=v=>+String(v||'').replace(/[^\d]/g,'')||0;
 function expFmtIn(el){const n=expNum(el.value);el.value=n?money(n):''}
-const expSum=(a,b)=>S.exp.filter(x=>x.date>=a&&x.date<=b).reduce((t,x)=>t+(+x.amt||0),0);
+const XI=[['salary','Зарплата','#2a7d56'],['bonus','Премия','#3f9d6e'],['side','Подработка','#0e8c8c'],['gift','Подарок','#d0569b'],['sell','Продажа вещей','#c9871f'],['other','Другое','#7b857f']];
+/* старые записи без поля kind — это расходы; доходы помечены kind:'inc' */
+const isInc=x=>x.kind==='inc';
+const fcats=k=>k==='inc'?XI:XC;
+const fcat=(k,id)=>fcats(k).find(c=>c[0]===id)||fcats(k)[fcats(k).length-1];
+const FMN=['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'];
+let finMonth=iso(new Date()).slice(0,7),finType='exp',finFilter='all',incCat='salary';
+const finRange=m=>{const last=new Date(+m.slice(0,4),+m.slice(5,7),0).getDate();return [m+'-01',m+'-'+String(last).padStart(2,'0')]};
+const finSum=(a,b,k)=>S.exp.filter(x=>x.date>=a&&x.date<=b&&isInc(x)===(k==='inc')).reduce((t,x)=>t+(+x.amt||0),0);
+const expSum=(a,b)=>finSum(a,b,'exp');
+const sgn=n=>(n<0?'−':n>0?'+':'')+money(Math.abs(n));
 function expWeek(d){const x=parse(d),off=(x.getDay()+6)%7,a=addDays(d,-off);return [a,addDays(a,6)]}
-function expMonth(d){const y=d.slice(0,4),m=d.slice(5,7),last=new Date(+y,+m,0).getDate();return [y+'-'+m+'-01',y+'-'+m+'-'+String(last).padStart(2,'0')]}
+function finShift(n){const d=new Date(+finMonth.slice(0,4),+finMonth.slice(5,7)-1+n,1);finMonth=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');render()}
+function fSetType(k){const a=$('xAmt'),n=$('xNote'),av=a?a.value:'',nv=n?n.value:'';finType=k;render();if($('xAmt'))$('xAmt').value=av;if($('xNote'))$('xNote').value=nv}
+function fSetCat(id,b){if(finType==='inc')incCat=id;else expCat=id;document.querySelectorAll('#xChips .xChip').forEach(e=>e.classList.toggle('on',e===b))}
 function viewExp(){
-  const d=expDate,t=today(),dx=parse(d),[wa,wb]=expWeek(d),[ma,mb]=expMonth(d);
-  const day=S.exp.filter(x=>x.date===d).sort((a,b)=>(b.time||'').localeCompare(a.time||'')||(b.created||0)-(a.created||0));
-  const sd=day.reduce((a,x)=>a+(+x.amt||0),0),sw=expSum(wa,wb),sm=expSum(ma,mb);
-  const lbl=d===t?'Сегодня':d===addDays(t,-1)?'Вчера':d===addDays(t,1)?'Завтра':WDF[dx.getDay()];
-  const by={};S.exp.filter(x=>x.date>=ma&&x.date<=mb).forEach(x=>by[x.cat]=(by[x.cat]||0)+(+x.amt||0));
-  const cats=Object.entries(by).sort((a,b)=>b[1]-a[1]),mx=cats.length?cats[0][1]:1;
-  const chips=XC.map(([id,n,c])=>`<button type="button" class="xChip${expCat===id?' on':''}" style="--c:${c}" onclick="expCat='${id}';document.querySelectorAll('.xChip').forEach(b=>b.classList.toggle('on',b===this))"><i></i>${esc(n)}</button>`).join('');
+  const t=today(),[ma,mb]=finRange(finMonth),[wa,wb]=expWeek(t),cur=finMonth===t.slice(0,7);
+  const mx=S.exp.filter(x=>x.date>=ma&&x.date<=mb);
+  const inc=finSum(ma,mb,'inc'),out=finSum(ma,mb,'exp'),bal=inc-out;
+  const isI=finType==='inc',cur0=isI?incCat:expCat;
+  const chips=fcats(finType).map(([id,n,c])=>`<button type="button" class="xChip${cur0===id?' on':''}" style="--c:${c}" onclick="fSetCat('${id}',this)"><i></i>${esc(n)}</button>`).join('');
+  const rows=mx.filter(x=>finFilter==='all'||isInc(x)===(finFilter==='inc')).sort((a,b)=>b.date.localeCompare(a.date)||(b.time||'').localeCompare(a.time||'')||(b.created||0)-(a.created||0));
+  const groups=[];rows.forEach(x=>{let g=groups[groups.length-1];if(!g||g.d!==x.date){g={d:x.date,l:[]};groups.push(g)}g.l.push(x)});
+  const dl=d=>{const dx=parse(d);return d===t?'Сегодня':d===addDays(t,-1)?'Вчера':dx.getDate()+' '+MON[dx.getMonth()]+', '+WDF[dx.getDay()]};
+  const list=groups.map(g=>{
+    const net=g.l.reduce((a,x)=>a+(isInc(x)?1:-1)*(+x.amt||0),0);
+    return `<div class="fDay"><span>${esc(dl(g.d))}</span><span>${sgn(net)}</span></div><div class="xList">${g.l.map(x=>{const i=isInc(x),c=fcat(i?'inc':'exp',x.cat);return `<button type="button" class="xItem" onclick="openExp('${x.id}')"><i style="background:${c[2]}"></i><span class="xInfo"><b>${esc(x.note||c[1])}</b><small>${x.time?esc(x.time)+' · ':''}${esc(c[1])}</small></span><span class="xSum${i?' inc':''}">${i?'+':'−'}${money(x.amt)}</span></button>`}).join('')}</div>`}).join('');
+  const brk=(k,title,empty)=>{
+    const by={};mx.filter(x=>isInc(x)===(k==='inc')).forEach(x=>by[x.cat]=(by[x.cat]||0)+(+x.amt||0));
+    const cs=Object.entries(by).sort((a,b)=>b[1]-a[1]);
+    if(!cs.length)return empty?`<section class="card"><h2>${title}</h2><p class="muted" style="margin:0">${empty}</p></section>`:'';
+    const mm=cs[0][1];
+    return `<section class="card"><h2>${title}</h2><div class="xCats">${cs.map(([id,v])=>{const c=fcat(k,id);return `<div class="xCat"><div class="xCatT"><span><i style="background:${c[2]}"></i>${esc(c[1])}</span><b>${money(v)}</b></div><div class="xBar"><i style="width:${Math.max(3,Math.round(v/mm*100))}%;background:${c[2]}"></i></div></div>`}).join('')}</div></section>`};
   return `<div class="stack xWrap">
     <section class="card xDay">
-      <button class="ib" onclick="expDate=addDays(expDate,-1);render()" aria-label="Предыдущий день">${ic('left')}</button>
-      <div class="xDayT"><small>${esc(lbl)}</small><b>${dx.getDate()} ${MON[dx.getMonth()]}</b></div>
-      ${d!==t?`<button class="btn sm" onclick="expDate=today();render()">Сегодня</button>`:''}
-      <button class="ib" onclick="expDate=addDays(expDate,1);render()" aria-label="Следующий день">${ic('right')}</button>
-    </section>
-    <section class="card">
-      <form class="xForm" onsubmit="event.preventDefault();addExp()">
-        <label class="xAmt"><input id="xAmt" type="text" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Сумма" oninput="expFmtIn(this)"><span>сум</span></label>
-        <div class="xChips" role="group" aria-label="Категория">${chips}</div>
-        <div class="xRow"><input id="xNote" type="text" maxlength="120" autocomplete="off" placeholder="На что потратили (необязательно)"><button type="submit" class="btn pri">${ic('plus')}Добавить</button></div>
-      </form>
+      <button class="ib" onclick="finShift(-1)" aria-label="Предыдущий месяц">${ic('left')}</button>
+      <div class="xDayT"><small>${cur?'Текущий месяц':'Другой месяц'}</small><b>${FMN[+finMonth.slice(5,7)-1]} ${finMonth.slice(0,4)}</b></div>
+      ${cur?'':`<button class="btn sm" onclick="finMonth=today().slice(0,7);render()">Сегодня</button>`}
+      <button class="ib" onclick="finShift(1)" aria-label="Следующий месяц">${ic('right')}</button>
     </section>
     <div class="stats3">
-      <div class="card stat"><b>${money(sd)}</b><span>за ${d===t?'сегодня':'этот день'}, сум</span></div>
-      <div class="card stat"><b>${money(sw)}</b><span>за неделю, сум</span></div>
-      <div class="card stat"><b>${money(sm)}</b><span>за ${['январь','февраль','март','апрель','май','июнь','июль','август','сентябрь','октябрь','ноябрь','декабрь'][dx.getMonth()]}, сум</span></div>
+      <div class="card stat"><b class="pos">${money(inc)}</b><span>Доходы, сум</span></div>
+      <div class="card stat"><b>${money(out)}</b><span>Расходы, сум</span></div>
+      <div class="card stat"><b class="${bal<0?'neg':'pos'}">${sgn(bal)}</b><span>Баланс, сум</span></div>
     </div>
+    <section class="card">
+      <form class="xForm" onsubmit="event.preventDefault();addExp()">
+        <div class="fSeg" role="group" aria-label="Тип операции"><button type="button" class="${isI?'':'on'}" onclick="fSetType('exp')">Расход</button><button type="button" class="${isI?'on inc':''}" onclick="fSetType('inc')">Доход</button></div>
+        <label class="xAmt"><input id="xAmt" type="text" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Сумма" oninput="expFmtIn(this)"><span>сум</span></label>
+        <div class="xChips" id="xChips" role="group" aria-label="Категория">${chips}</div>
+        <div class="fRow"><input id="xDt" type="date" value="${expDate}" aria-label="Дата" onchange="expDate=this.value||expDate"><input id="xNote" type="text" maxlength="120" autocomplete="off" placeholder="${isI?'От кого или за что (необязательно)':'На что потратили (необязательно)'}"><button type="submit" class="btn pri">${ic('plus')}${isI?'Добавить доход':'Добавить расход'}</button></div>
+      </form>
+      <p class="fHint">Сегодня потрачено <b>${money(expSum(t,t))}</b> сум · за неделю <b>${money(expSum(wa,wb))}</b> сум</p>
+    </section>
     <div class="two">
-      <section class="card"><h2>Траты за день</h2>
-        ${day.length?`<div class="xList">${day.map(x=>{const c=xcat(x.cat);return `<button type="button" class="xItem" onclick="openExp('${x.id}')"><i style="background:${c[2]}"></i><span class="xInfo"><b>${esc(x.note||c[1])}</b><small>${x.time?esc(x.time)+' · ':''}${esc(c[1])}</small></span><span class="xSum">${money(x.amt)}</span></button>`}).join('')}</div>`
-        :`<p class="muted" style="margin:0">Пока ничего. Впишите сумму сверху и нажмите «Добавить».</p>`}
+      <section class="card"><h2>Операции</h2>
+        <div class="fTabs">${[['all','Все'],['exp','Расходы'],['inc','Доходы']].map(([k,l])=>`<button type="button" class="xChip${finFilter===k?' on':''}" onclick="finFilter='${k}';render()">${l}</button>`).join('')}</div>
+        ${list||`<p class="muted" style="margin:0">В этом месяце записей нет. Добавьте расход или доход сверху.</p>`}
       </section>
-      <section class="card"><h2>По категориям за месяц</h2>
-        ${cats.length?`<div class="xCats">${cats.map(([id,v])=>{const c=xcat(id);return `<div class="xCat"><div class="xCatT"><span><i style="background:${c[2]}"></i>${esc(c[1])}</span><b>${money(v)}</b></div><div class="xBar"><i style="width:${Math.max(3,Math.round(v/mx*100))}%;background:${c[2]}"></i></div></div>`}).join('')}</div>`
-        :`<p class="muted" style="margin:0">В этом месяце расходов ещё нет.</p>`}
-      </section>
+      <div class="stack">${brk('exp','Расходы по категориям','Расходов в этом месяце ещё нет.')}${brk('inc','Доходы по источникам','')}</div>
     </div>
   </div>`;
 }
 function addExp(){
   const el=$('xAmt'),n=expNum(el.value);if(!n){el.focus();toast('Введите сумму');return}
-  const now=new Date(),tm=expDate===today()?String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'):'';
-  S.exp.push({id:uid(),amt:n,cat:expCat,note:$('xNote').value.trim(),date:expDate,time:tm,created:Date.now()});
-  save();render();toast('Добавлено: '+money(n)+' сум');setTimeout(()=>{const a=$('xAmt');if(a)a.focus()},0);
+  const dt=$('xDt'),d=(dt&&dt.value)||expDate;expDate=d;
+  const now=new Date(),tm=d===today()?String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0'):'';
+  const inc=finType==='inc';
+  S.exp.push({id:uid(),amt:n,cat:inc?incCat:expCat,note:$('xNote').value.trim(),date:d,time:tm,created:Date.now(),...(inc?{kind:'inc'}:{})});
+  finMonth=d.slice(0,7);
+  save();render();toast((inc?'Доход добавлен: +':'Расход добавлен: ')+money(n)+' сум');setTimeout(()=>{const a=$('xAmt');if(a)a.focus()},0);
 }
 function openExp(id){
   const x=S.exp.find(e=>e.id===id);if(!x)return;editExp=id;
-  const sel=$('xeCat');if(!sel.options.length)sel.innerHTML=XC.map(([i,n])=>`<option value="${i}">${esc(n)}</option>`).join('');
-  $('xeAmt').value=money(x.amt);sel.value=x.cat;$('xeDate').value=x.date;$('xeTime').value=x.time||'';$('xeNote').value=x.note||'';
+  const k=isInc(x)?'inc':'exp',sel=$('xeCat');
+  sel.innerHTML=fcats(k).map(([i,n])=>`<option value="${i}">${esc(n)}</option>`).join('');
+  sel.value=fcat(k,x.cat)[0];if(sel._cs)sel._cs.sync();
+  $('xeHead').textContent=k==='inc'?'Изменить доход':'Изменить расход';
+  $('xeNote').parentNode.firstChild.nodeValue=k==='inc'?'От кого или за что':'На что';
+  $('xeAmt').value=money(x.amt);$('xeDate').value=x.date;$('xeTime').value=x.time||'';$('xeNote').value=x.note||'';
   $('dlgExp').showModal();
 }
 function saveExpDlg(){
   const x=S.exp.find(e=>e.id===editExp);if(!x)return;const n=expNum($('xeAmt').value);if(!n){$('xeAmt').focus();return}
   Object.assign(x,{amt:n,cat:$('xeCat').value,date:$('xeDate').value||x.date,time:$('xeTime').value,note:$('xeNote').value.trim()});
-  $('dlgExp').close();save();render();toast('Расход сохранён');
+  $('dlgExp').close();save();render();toast(isInc(x)?'Доход сохранён':'Расход сохранён');
 }
 function delExp(id,fromDlg){
   const i=S.exp.findIndex(e=>e.id===id);if(i<0)return;const x=S.exp[i];S.exp.splice(i,1);
   if(fromDlg)$('dlgExp').close();save();render();toast('Удалено: '+money(x.amt)+' сум',()=>S.exp.splice(i,0,x));
 }
+
 /* ======================= отрисовка ======================= */
 function render(){
   renderNav();
-  const T={day:'ASMO',sched:'График',plans:'Планы',done:'Выполнено',exp:'Расходы',bot:'Телеграм-бот',data:'Данные'};
+  const T={day:'ASMO',sched:'График',plans:'Планы',done:'Выполнено',exp:'Финансы',bot:'Телеграм-бот',data:'Данные'};
   $('title').textContent=T[view];
   const pdf=`<button class="btn" onclick="dlgExport.showModal()">${ic('dl')}PDF</button>`;
   $('acts').innerHTML=pdf+(view==='day'?`<button class="btn pri" onclick="openTask()">${ic('plus')}Задача</button>`:view==='plans'?`<button class="btn pri" onclick="openPlan()">${ic('plus')}План</button>`:view==='sched'?`<button class="btn pri" onclick="openR()">${ic('plus')}Пункт</button>`:'');
