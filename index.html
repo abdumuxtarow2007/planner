@@ -548,6 +548,9 @@ body{background:var(--ground);color:var(--ink)}
 .holdHead{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
 .holdHead h2{margin:0}.holdN{background:#e6eefb;color:#2c4f9a;font-weight:700;border-radius:999px;padding:2px 10px;font-size:13px}
 .holdCh{margin-left:auto;display:flex;color:var(--muted);transition:transform .15s}.holdCh.open{transform:rotate(90deg)}.holdList{margin-top:10px}
+.hSvg{width:100%;height:auto;display:block}.hGrid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.hGrid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.hGrid3 input{min-width:0}
+.hSum{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}.hSum small{display:block;color:var(--muted);font-size:13px}.hSum b{font-size:16px}
+.hKc{display:flex;align-items:baseline;gap:10px}.hKc b{font:800 34px/1.1 var(--sans);letter-spacing:-.02em;font-variant-numeric:tabular-nums}.hKc b.neg{color:var(--pome)}.hKc span{color:var(--muted);font-weight:600}
 </style>
 </head>
 <body>
@@ -786,14 +789,14 @@ body{background:var(--ground);color:var(--ink)}
 const KEY='planner_v1', SEEDKEY='planner_seeded_v1';
 const SEED=[];
 const SEED_PLANS=[];
-let S={tasks:[],plans:[],routine:[],exp:[],rx:[],rdone:{},del:{},rdu:{}},storageOK=true;
+let S={tasks:[],plans:[],routine:[],exp:[],rx:[],wt:[],ml:[],hp:[],rdone:{},del:{},rdu:{}},storageOK=true;
 let expDate=iso(new Date()),expCat='food',view='day',selDate=iso(new Date()),editTask=null,editPlan=null,doneQ='',doneRange='all';
 
 function load(){
   let seeded=false;
   try{
     const raw=localStorage.getItem(KEY);
-    if(raw){const o=JSON.parse(raw);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.exp=o.exp||[];S.rx=o.rx||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};
+    if(raw){const o=JSON.parse(raw);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.exp=o.exp||[];S.rx=o.rx||[];S.wt=o.wt||[];S.ml=o.ml||[];S.hp=o.hp||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};
       const old=addDays(iso(new Date()),-60);for(const k in S.rdone)if(k<old)delete S.rdone[k]}
     seeded=!!localStorage.getItem(SEEDKEY);
   }catch(e){storageOK=false}
@@ -859,7 +862,7 @@ function toast(m,undo){
 function go(v){view=v;render();window.scrollTo(0,0);if(v==='bot'&&AU)tgLoad();else tgPollUpd()}
 function renderNav(){
   const t=today(),open=S.tasks.filter(x=>!x.done&&!x.hold&&x.date===t).length,od=S.tasks.filter(x=>!x.done&&!x.hold&&x.date<t).length;
-  const items=[['day','cal','День',od?`<span class="badge red">${od}</span>`:(open?`<span class="badge">${open}</span>`:'')],['sched','clock','График',''],['plans','plans','Планы',''],['done','done','Готово',''],['exp','wallet','Финансы',''],['bot','send','Бот',TG.token?`<span class="dot ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"></span>`:''],['data','data','Данные','']];
+  const items=[['day','cal','День',od?`<span class="badge red">${od}</span>`:(open?`<span class="badge">${open}</span>`:'')],['sched','clock','График',''],['plans','plans','Планы',''],['done','done','Готово',''],['exp','wallet','Финансы',''],['hl','heart','Здоровье',''],['bot','send','Бот',TG.token?`<span class="dot ${tgStatus==='on'?'ok':tgStatus==='pair'||tgStatus==='wait'?'':'bad'}"></span>`:''],['data','data','Данные','']];
   $('nav').innerHTML=items.map(([k,i,l,b])=>`<button class="${view===k?'on':''}" onclick="go('${k}')">${ic(i)}<span>${l}</span>${b}</button>`).join('');
 }
 
@@ -1181,7 +1184,7 @@ function doExport(){
 
 
 /* ======================= синхронизация между устройствами ======================= */
-const SYKEY='planner_sync_v1',SYFILE='planner-data.json',COLS=['tasks','plans','routine','exp','rx'];
+const SYKEY='planner_sync_v1',SYFILE='planner-data.json',COLS=['tasks','plans','routine','exp','rx','wt','ml','hp'];
 let SY={last:0},syStatus='off',syEtag='',syBusy=false,syAgain=false,syPending=false,syTimer=null,SNAP={tasks:{},plans:{},routine:{},rdone:{}};
 const SYS={off:'Не подключена',sync:'Синхронизация…',ok:'Синхронизировано',offline:'Нет связи, повторю позже',badtoken:'Токен не подходит или отозван — подключите заново'};
 function stable(v){
@@ -1208,15 +1211,15 @@ function stamp(){
   });
   return ch;
 }
-const dataOf=o=>({tasks:o.tasks||[],plans:o.plans||[],routine:o.routine||[],exp:o.exp||[],rx:o.rx||[],rdone:o.rdone||{},del:o.del||{},rdu:o.rdu||{}});
+const dataOf=o=>({tasks:o.tasks||[],plans:o.plans||[],routine:o.routine||[],exp:o.exp||[],rx:o.rx||[],wt:o.wt||[],ml:o.ml||[],hp:o.hp||[],rdone:o.rdone||{},del:o.del||{},rdu:o.rdu||{}});
 function canon(o){
   const d=dataOf(o),byId=(a,b)=>String(a.id).localeCompare(String(b.id)),rd={};
   for(const k in d.rdone)rd[k]=[...d.rdone[k]].sort();
-  return stable({...d,tasks:[...d.tasks].sort(byId),plans:[...d.plans].sort(byId),routine:[...d.routine].sort(byId),exp:[...d.exp].sort(byId),rx:[...d.rx].sort(byId),rdone:rd});
+  return stable({...d,tasks:[...d.tasks].sort(byId),plans:[...d.plans].sort(byId),routine:[...d.routine].sort(byId),exp:[...d.exp].sort(byId),rx:[...d.rx].sort(byId),wt:[...d.wt].sort(byId),ml:[...d.ml].sort(byId),hp:[...d.hp].sort(byId),rdone:rd});
 }
 function mergeData(L,R){
   L=dataOf(L);R=dataOf(R);
-  const out={tasks:[],plans:[],routine:[],exp:[],rx:[],rdone:{},del:{},rdu:{}},cutT=Date.now()-90*864e5;
+  const out={tasks:[],plans:[],routine:[],exp:[],rx:[],wt:[],ml:[],hp:[],rdone:{},del:{},rdu:{}},cutT=Date.now()-90*864e5;
   for(const id of new Set([...Object.keys(L.del),...Object.keys(R.del)])){const t=Math.max(L.del[id]||0,R.del[id]||0);if(t>cutT)out.del[id]=t}
   COLS.forEach(c=>{
     const rm=new Map(R[c].map(x=>[x.id,x])),seen=new Set();
@@ -1353,7 +1356,7 @@ async function auFromLink(){
   try{const u=await auCall('/auth/v1/user',null,h.get('access_token'));
     auSet({access_token:h.get('access_token'),refresh_token:h.get('refresh_token'),expires_in:+h.get('expires_in')||3600,user:u});auEnter()}catch(e){}
 }
-function wipeLocal(){S={tasks:[],plans:[],routine:[],exp:[],rx:[],rdone:{},del:{},rdu:{}};snap();persist()}
+function wipeLocal(){S={tasks:[],plans:[],routine:[],exp:[],rx:[],wt:[],ml:[],hp:[],rdone:{},del:{},rdu:{}};snap();persist()}
 function auEnter(){
   let owner='';try{owner=localStorage.getItem(OWKEY)||''}catch(e){}
   if(owner&&owner!==AU.uid)wipeLocal();          /* на устройстве были данные другого аккаунта */
@@ -1842,7 +1845,7 @@ function viewBot(){
       <div class="ex"><b>/overdue, /plans, /done</b><span>просроченные, планы, готовое</span></div></section>${how}</div>`;
 }
 window.addEventListener('storage',e=>{
-  if(e.key===KEY&&e.newValue){try{const o=JSON.parse(e.newValue);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.exp=o.exp||[];S.rx=o.rx||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};snap()}catch(_){}softRender()}
+  if(e.key===KEY&&e.newValue){try{const o=JSON.parse(e.newValue);S.tasks=o.tasks||[];S.plans=o.plans||[];S.routine=o.routine||[];S.exp=o.exp||[];S.rx=o.rx||[];S.wt=o.wt||[];S.ml=o.ml||[];S.hp=o.hp||[];S.rdone=o.rdone||{};S.del=o.del||{};S.rdu=o.rdu||{};snap()}catch(_){}softRender()}
   if(e.key===AUKEY){const was=AU&&AU.uid;auLoad();auGate();if((AU&&AU.uid)!==was){try{const o=JSON.parse(localStorage.getItem(KEY)||'{}');S={...S,...dataOf(o)};snap()}catch(_){}render();if(AU)syRun()}}
 });
 
@@ -1947,14 +1950,147 @@ function delExp(id,fromDlg){
   if(fromDlg)$('dlgExp').close();save();render();toast('Удалено: '+money(x.amt)+' сум',()=>S.exp.splice(i,0,x));
 }
 
+/* ======================= здоровье: вес, рост, возраст, калории ======================= */
+IC.heart='<path d="M12 20.5s-7.5-4.6-7.5-10.2A4.3 4.3 0 0 1 12 7.6a4.3 4.3 0 0 1 7.5 2.7c0 5.6-7.5 10.2-7.5 10.2z"/>';
+const HACT=[[1.2,'Почти не двигаюсь'],[1.375,'Лёгкая: 1–3 тренировки в неделю'],[1.55,'Средняя: 3–5 тренировок'],[1.725,'Высокая: 6–7 тренировок']];
+const HGOAL=[['lose','Сбросить вес'],['keep','Держать вес'],['gain','Набрать вес']];
+const HMEAL=[['b','Завтрак'],['l','Обед'],['d','Ужин'],['s','Перекус']];
+let hlDate=iso(new Date()),hlMeal='b',hlEdit=false;
+const hNum=v=>{const n=parseFloat(String(v||'').replace(',','.').replace(/[^\d.]/g,''));return isFinite(n)?n:0};
+const hKg=n=>(Math.round(n*10)/10).toString().replace('.',',');
+const hSg=n=>(n>0?'+':n<0?'−':'')+hKg(Math.abs(n));
+const hProf=()=>S.hp[0]||{};
+const hWts=()=>[...S.wt].sort((a,b)=>a.date.localeCompare(b.date));
+function hCalc(){
+  const p=hProf(),ws=hWts(),w=ws.length?ws[ws.length-1].kg:0;
+  if(!(p.h&&p.age&&w))return null;
+  const bmr=10*w+6.25*p.h-5*p.age+(p.sex==='f'?-161:5),tdee=bmr*(p.act||1.375);
+  const auto=Math.round(tdee*(p.goal==='lose'?0.85:p.goal==='gain'?1.1:1)/10)*10;
+  return {bmr:Math.round(bmr),tdee:Math.round(tdee),auto,norm:p.kcal||auto,w};
+}
+function hBmi(w,h){if(!(w&&h))return null;const b=w/((h/100)*(h/100));return {v:Math.round(b*10)/10,t:b<18.5?'ниже нормы':b<25?'норма':b<30?'выше нормы':'ожирение'}}
+function hDelta(ws,days){
+  if(ws.length<2)return null;const l=ws[ws.length-1],lim=addDays(l.date,-days);let ref=null;
+  for(const x of ws)if(x.date<=lim)ref=x;
+  if(!ref)ref=ws[0];if(ref===l)return null;return Math.round((l.kg-ref.kg)*10)/10;
+}
+function hSaveProf(){
+  const g=id=>$(id).value,p={id:'me',h:Math.round(hNum(g('hpH'))),age:Math.round(hNum(g('hpA'))),sex:g('hpS'),act:+g('hpAct'),goal:g('hpG'),tw:hNum(g('hpTw')),kcal:Math.round(hNum(g('hpK')))};
+  if(p.h&&(p.h<100||p.h>250)){toast('Рост: от 100 до 250 см');return}
+  if(p.age&&(p.age<10||p.age>100)){toast('Возраст: от 10 до 100 лет');return}
+  const o=S.hp[0];if(o)Object.assign(o,p);else S.hp.push(p);
+  hlEdit=false;save();render();toast('Профиль сохранён');
+}
+function hAddW(){
+  const kg=Math.round(hNum($('hwKg').value)*10)/10;
+  if(!(kg>=20&&kg<=400)){$('hwKg').focus();toast('Введите вес в кг');return}
+  const d=($('hwDt')&&$('hwDt').value)||today(),ex=S.wt.find(x=>x.date===d);
+  if(ex)ex.kg=kg;else S.wt.push({id:uid(),date:d,kg});
+  save();render();toast('Вес записан: '+hKg(kg)+' кг');
+}
+function hDelW(id){const i=S.wt.findIndex(x=>x.id===id);if(i<0)return;const x=S.wt[i];S.wt.splice(i,1);save();render();toast('Удалено: '+hKg(x.kg)+' кг',()=>S.wt.splice(i,0,x))}
+function hAddM(){
+  const kc=Math.round(hNum($('hmK').value));
+  if(!kc){$('hmK').focus();toast('Введите калории');return}
+  const mn=(HMEAL.find(m=>m[0]===hlMeal)||[])[1]||'Еда',m={id:uid(),date:hlDate,meal:hlMeal,name:$('hmN').value.trim()||mn,kcal:kc,created:Date.now()};
+  [['hmP','p'],['hmF','f'],['hmC','c']].forEach(([id,k])=>{const v=Math.round(hNum($(id).value));if(v>0)m[k]=v});
+  S.ml.push(m);save();render();toast('Добавлено: '+money(kc)+' ккал');
+}
+function hFreq(){
+  const c={};S.ml.forEach(x=>{if(!x.name)return;const k=x.name+'|'+x.kcal;(c[k]=c[k]||{n:0,x}).n++;if((x.created||0)>(c[k].x.created||0))c[k].x=x});
+  return Object.values(c).sort((a,b)=>b.n-a.n||(b.x.created||0)-(a.x.created||0)).slice(0,8).map(o=>o.x);
+}
+function hQuick(i){
+  const x=hFreq()[i];if(!x)return;const m={id:uid(),date:hlDate,meal:hlMeal,name:x.name,kcal:x.kcal,created:Date.now()};
+  ['p','f','c'].forEach(k=>{if(x[k])m[k]=x[k]});S.ml.push(m);save();render();toast('Добавлено: '+money(x.kcal)+' ккал');
+}
+function hDelM(id){const i=S.ml.findIndex(x=>x.id===id);if(i<0)return;const x=S.ml[i];S.ml.splice(i,1);save();render();toast('Удалено: '+money(x.kcal)+' ккал',()=>S.ml.splice(i,0,x))}
+function hShift(n){hlDate=addDays(hlDate,n);render()}
+function hSetMeal(id,b){hlMeal=id;document.querySelectorAll('#hmChips .xChip').forEach(e=>e.classList.toggle('on',e===b))}
+function hChart(a){
+  if(a.length<2)return '<p class="muted" style="margin:0 0 4px">График появится, когда будет хотя бы две записи веса.</p>';
+  a=a.slice(-40);const W=600,H=180,pl=44,pr=12,pt=12,pb=26,tw=hProf().tw||0,ks=a.map(x=>x.kg);
+  let mn=Math.min(...ks,...(tw?[tw]:[])),mx=Math.max(...ks,...(tw?[tw]:[]));if(mx-mn<2){mn-=1;mx+=1}
+  const pd=(mx-mn)*0.12;mn-=pd;mx+=pd;
+  const t0=parse(a[0].date).getTime(),t1=parse(a[a.length-1].date).getTime();
+  const X=d=>pl+(t1===t0?0.5:(parse(d).getTime()-t0)/(t1-t0))*(W-pl-pr),Y=k=>pt+(1-(k-mn)/(mx-mn))*(H-pt-pb);
+  const pts=a.map(x=>X(x.date).toFixed(1)+','+Y(x.kg).toFixed(1)).join(' ');
+  const gl=[mn+pd,(mn+mx)/2,mx-pd].map(v=>`<line x1="${pl}" x2="${W-pr}" y1="${Y(v).toFixed(1)}" y2="${Y(v).toFixed(1)}" stroke="#e3e8e5"/><text x="${pl-6}" y="${(Y(v)+4).toFixed(1)}" text-anchor="end" font-size="12" fill="#7b857f">${hKg(v)}</text>`).join('');
+  const tl=tw?`<line x1="${pl}" x2="${W-pr}" y1="${Y(tw).toFixed(1)}" y2="${Y(tw).toFixed(1)}" stroke="#2a7d56" stroke-dasharray="5 4"/><text x="${W-pr}" y="${(Y(tw)-5).toFixed(1)}" text-anchor="end" font-size="12" fill="#2a7d56">цель ${hKg(tw)}</text>`:'';
+  const dots=a.map(x=>`<circle cx="${X(x.date).toFixed(1)}" cy="${Y(x.kg).toFixed(1)}" r="3.5" fill="#fff" stroke="var(--acc)" stroke-width="2"/>`).join('');
+  return `<svg class="hSvg" viewBox="0 0 ${W} ${H}" role="img" aria-label="График веса">${gl}${tl}<polyline points="${pts}" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round"/>${dots}<text x="${pl}" y="${H-6}" font-size="12" fill="#7b857f">${esc(fmt(a[0].date))}</text><text x="${W-pr}" y="${H-6}" text-anchor="end" font-size="12" fill="#7b857f">${esc(fmt(a[a.length-1].date))}</text></svg>`;
+}
+function viewHl(){
+  const p=hProf(),C=hCalc(),ws=hWts(),last=ws[ws.length-1],t=today(),bmi=hBmi(last&&last.kg,p.h);
+  const d7=hDelta(ws,7),tw=p.tw||0;
+  const third=tw&&last?`<div class="card stat"><b class="${Math.abs(last.kg-tw)<0.05?'pos':''}">${hKg(Math.abs(last.kg-tw))}</b><span>${last.kg>tw?'осталось сбросить':last.kg<tw?'осталось набрать':'цель достигнута'}, кг</span></div>`
+    :`<div class="card stat"><b>${bmi?bmi.v.toString().replace('.',','):'—'}</b><span>${bmi?'ИМТ: '+bmi.t:'ИМТ (нужен рост)'}</span></div>`;
+  const stats=`<div class="stats3"><div class="card stat"><b>${last?hKg(last.kg):'—'}</b><span>вес, кг${last?' · '+esc(fmt(last.date)):''}</span></div><div class="card stat"><b>${d7==null?'—':hSg(d7)}</b><span>за неделю, кг</span></div>${third}</div>`;
+  const opt=(arr,cur)=>arr.map(([v,n])=>`<option value="${v}"${String(v)===String(cur)?' selected':''}>${esc(n)}</option>`).join('');
+  const profForm=`<form onsubmit="event.preventDefault();hSaveProf()"><div class="hGrid2">
+      <label class="f">Рост, см<input id="hpH" type="text" inputmode="numeric" autocomplete="off" value="${p.h||''}" placeholder="170"></label>
+      <label class="f">Возраст, лет<input id="hpA" type="text" inputmode="numeric" autocomplete="off" value="${p.age||''}" placeholder="25"></label>
+      <label class="f">Пол<select id="hpS"><option value="m"${p.sex!=='f'?' selected':''}>Мужской</option><option value="f"${p.sex==='f'?' selected':''}>Женский</option></select></label>
+      <label class="f">Цель<select id="hpG">${opt(HGOAL,p.goal||'keep')}</select></label>
+      <label class="f">Активность<select id="hpAct">${opt(HACT,p.act||1.375)}</select></label>
+      <label class="f">Целевой вес, кг<input id="hpTw" type="text" inputmode="decimal" autocomplete="off" value="${p.tw?hKg(p.tw):''}" placeholder="необязательно"></label>
+      <label class="f">Своя норма, ккал<input id="hpK" type="text" inputmode="numeric" autocomplete="off" value="${p.kcal||''}" placeholder="пусто — посчитаю сам"></label>
+    </div><div class="dFoot" style="margin-top:14px">${p.id?`<button type="button" class="btn" onclick="hlEdit=false;render()">Отмена</button>`:''}<button type="submit" class="btn pri">Сохранить</button></div></form>`;
+  const goalN=(HGOAL.find(g=>g[0]===(p.goal||'keep'))||[])[1];
+  const profView=`<div class="hSum"><div><small>Рост</small><b>${p.h||'—'} см</b></div><div><small>Возраст</small><b>${p.age||'—'}</b></div><div><small>Цель</small><b>${esc(goalN||'')}</b></div></div>
+    ${C?`<p class="fHint">Обмен веществ в покое <b>${money(C.bmr)}</b> ккал, с учётом активности <b>${money(C.tdee)}</b>. ${p.kcal?'Ваша норма':'Норма под цель'}: <b>${money(C.norm)}</b> ккал в день.</p>`:`<p class="fHint">Добавьте вес, рост и возраст, чтобы я посчитал дневную норму калорий.</p>`}
+    <p class="muted small" style="margin:10px 0 0">Расчёт по формуле Миффлина — Сан Жеора, это ориентир, а не медицинская рекомендация.</p>`;
+  const profCard=`<section class="card"><div class="listHead"><h2>Профиль</h2>${!hlEdit&&p.id?`<button class="linkBtn" onclick="hlEdit=true;render()">Изменить</button>`:''}</div>${(hlEdit||!p.id)?profForm:profView}</section>`;
+  /* вес */
+  const rows=[...ws].reverse().slice(0,8).map((x,i,arr)=>{const prev=ws[ws.length-1-i-1],df=prev?Math.round((x.kg-prev.kg)*10)/10:null;
+    return `<div class="xItem" style="cursor:default"><i style="background:var(--acc)"></i><span class="xInfo"><b>${hKg(x.kg)} кг</b><small>${esc(fmt(x.date))}</small></span><span class="xSum${df!=null&&df<=0?' inc':''}">${df==null?'':hSg(df)}</span><button class="ib" aria-label="Удалить запись" onclick="hDelW('${x.id}')">${ic('trash')}</button></div>`}).join('');
+  const wCard=`<section class="card"><h2>Вес</h2>
+    <form class="xForm" onsubmit="event.preventDefault();hAddW()">
+      <label class="xAmt"><input id="hwKg" type="text" inputmode="decimal" autocomplete="off" placeholder="0,0" aria-label="Вес"><span>кг</span></label>
+      <div class="fRow" style="grid-template-columns:170px auto"><input id="hwDt" type="date" value="${t}" aria-label="Дата"><button type="submit" class="btn pri">${ic('plus')}Записать вес</button></div>
+    </form>
+    <div style="margin-top:16px">${hChart(ws)}</div>
+    ${rows?`<div class="xList" style="margin-top:8px">${rows}</div>`:''}
+  </section>`;
+  /* калории */
+  const day=S.ml.filter(x=>x.date===hlDate),eaten=day.reduce((a,x)=>a+x.kcal,0),norm=C?C.norm:0;
+  const pf=['p','f','c'].map(k=>day.reduce((a,x)=>a+(x[k]||0),0));
+  const pct=norm?Math.min(100,Math.round(eaten/norm*100)):0,over=norm&&eaten>norm;
+  const lbl=hlDate===t?'Сегодня':hlDate===addDays(t,-1)?'Вчера':hlDate===addDays(t,1)?'Завтра':WDF[parse(hlDate).getDay()],dx=parse(hlDate);
+  const fq=hFreq();
+  const meals=HMEAL.map(([id,n])=>{const l=day.filter(x=>(x.meal||'s')===id).sort((a,b)=>(a.created||0)-(b.created||0));if(!l.length)return '';
+    return `<div class="fDay"><span>${n}</span><span>${money(l.reduce((a,x)=>a+x.kcal,0))} ккал</span></div><div class="xList">${l.map(x=>`<div class="xItem" style="cursor:default"><i style="background:var(--saffron)"></i><span class="xInfo"><b>${esc(x.name)}</b><small>${[x.p?'Б '+x.p:'',x.f?'Ж '+x.f:'',x.c?'У '+x.c:''].filter(Boolean).join(' · ')||'&nbsp;'}</small></span><span class="xSum">${money(x.kcal)}</span><button class="ib" aria-label="Удалить" onclick="hDelM('${x.id}')">${ic('trash')}</button></div>`).join('')}</div>`}).join('');
+  const kCard=`<section class="card"><h2>Калории</h2>
+    <div class="xDay" style="box-shadow:none;padding:0;margin-bottom:12px">
+      <button class="ib" onclick="hShift(-1)" aria-label="Предыдущий день">${ic('left')}</button>
+      <div class="xDayT"><small>${esc(lbl)}</small><b>${dx.getDate()} ${MON[dx.getMonth()]}</b></div>
+      ${hlDate!==t?`<button class="btn sm" onclick="hlDate=today();render()">Сегодня</button>`:''}
+      <button class="ib" onclick="hShift(1)" aria-label="Следующий день">${ic('right')}</button>
+    </div>
+    <div class="hKc"><b class="${over?'neg':''}">${money(eaten)}</b><span>${norm?'из '+money(norm)+' ккал':'ккал'}</span></div>
+    ${norm?`<div class="xBar" style="margin:8px 0 6px"><i style="width:${Math.max(2,pct)}%;background:${over?'var(--pome)':'var(--acc)'}"></i></div><p class="fHint" style="margin:0 0 4px">${over?`Выше нормы на <b>${money(eaten-norm)}</b> ккал`:`Осталось <b>${money(norm-eaten)}</b> ккал`}${pf.some(Boolean)?` · Б ${pf[0]} · Ж ${pf[1]} · У ${pf[2]} г`:''}</p>`:`<p class="fHint" style="margin:6px 0 4px">Норма появится после заполнения профиля и веса.${pf.some(Boolean)?` Б ${pf[0]} · Ж ${pf[1]} · У ${pf[2]} г`:''}</p>`}
+    <form class="xForm" style="margin-top:12px" onsubmit="event.preventDefault();hAddM()">
+      <div class="xChips" id="hmChips" role="group" aria-label="Приём пищи">${HMEAL.map(([id,n])=>`<button type="button" class="xChip${hlMeal===id?' on':''}" onclick="hSetMeal('${id}',this)">${n}</button>`).join('')}</div>
+      <label class="xAmt"><input id="hmK" type="text" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Калории"><span>ккал</span></label>
+      <input id="hmN" type="text" maxlength="80" autocomplete="off" placeholder="Что съели (необязательно)">
+      <div class="hGrid3"><input id="hmP" type="text" inputmode="numeric" autocomplete="off" placeholder="Белки, г"><input id="hmF" type="text" inputmode="numeric" autocomplete="off" placeholder="Жиры, г"><input id="hmC" type="text" inputmode="numeric" autocomplete="off" placeholder="Углеводы, г"></div>
+      <button type="submit" class="btn pri" style="width:100%;justify-content:center">${ic('plus')}Добавить</button>
+    </form>
+    ${fq.length?`<p class="muted small" style="margin:14px 0 6px">Часто едите — добавить в выбранный приём:</p><div class="xChips">${fq.map((x,i)=>`<button type="button" class="xChip" onclick="hQuick(${i})">${esc(x.name)} · ${money(x.kcal)}</button>`).join('')}</div>`:''}
+    ${meals||`<p class="muted" style="margin:14px 0 0">За этот день ничего не записано.</p>`}
+  </section>`;
+  return `<div class="stack xWrap">${stats}${p.id?'':profCard}${kCard}${wCard}${p.id?profCard:''}</div>`;
+}
+
+
 /* ======================= отрисовка ======================= */
 function render(){
   renderNav();
-  const T={day:'ASMO',sched:'График',plans:'Планы',done:'Выполнено',exp:'Финансы',bot:'Телеграм-бот',data:'Данные'};
+  const T={day:'ASMO',sched:'График',plans:'Планы',done:'Выполнено',exp:'Финансы',hl:'Здоровье',bot:'Телеграм-бот',data:'Данные'};
   $('title').textContent=T[view];
   const pdf=`<button class="btn" onclick="dlgExport.showModal()">${ic('dl')}PDF</button>`;
   $('acts').innerHTML=pdf+(view==='day'?`<button class="btn pri" onclick="openTask()">${ic('plus')}Задача</button>`:view==='plans'?`<button class="btn pri" onclick="openPlan()">${ic('plus')}План</button>`:view==='sched'?`<button class="btn pri" onclick="openR()">${ic('plus')}Пункт</button>`:'');
-  $('view').innerHTML=view==='day'?viewDay():view==='plans'?viewPlans():view==='sched'?viewSched():view==='done'?viewDone():view==='exp'?viewExp():view==='bot'?viewBot():viewData();
+  $('view').innerHTML=view==='day'?viewDay():view==='plans'?viewPlans():view==='sched'?viewSched():view==='done'?viewDone():view==='exp'?viewExp():view==='hl'?viewHl():view==='bot'?viewBot():viewData();
   if(view==='done')renderDoneList();
 }
 ['dlgTask','dlgPlan','dlgExport','dlgMove','dlgR','dlgExp','dlgRX'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target.id===id)e.target.close()}));
