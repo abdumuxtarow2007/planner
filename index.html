@@ -541,6 +541,9 @@ body{background:var(--ground);color:var(--ink)}
 .hb{display:inline-block;font-size:12px;font-weight:700;padding:2px 9px;border-radius:999px;background:#eef1f7;color:#3d4f7a}
 .hb.wait{background:#e6eefb;color:#2c4f9a}.hb.later{background:#f1ecf8;color:#6a4a9a}.hb.block{background:#fdeede;color:#a05a12}
 .holdBox{border-left:4px solid #6a7fbf}
+.holdHead{display:flex;align-items:center;gap:10px;width:100%;background:none;border:0;padding:0;font:inherit;color:inherit;cursor:pointer;text-align:left}
+.holdHead h2{margin:0}.holdN{background:#e6eefb;color:#2c4f9a;font-weight:700;border-radius:999px;padding:2px 10px;font-size:13px}
+.holdCh{margin-left:auto;display:flex;color:var(--muted);transition:transform .15s}.holdCh.open{transform:rotate(90deg)}.holdList{margin-top:10px}
 </style>
 </head>
 <body>
@@ -857,6 +860,7 @@ function renderNav(){
 }
 
 /* ======================= задачи ======================= */
+let holdOpen=false;
 const HOLD={wait:'Жду ответа',later:'Отложено',block:'Стоит'};
 const dayTasks=d=>S.tasks.filter(t=>t.date===d&&!(t.hold&&!t.done));
 function unhold(id){const t=S.tasks.find(x=>x.id===id);if(!t)return;const h=t.hold;t.hold='';save();render();toast('Возвращено в работу',()=>{t.hold=h})}
@@ -1015,7 +1019,7 @@ function viewDay(){
   return heroHTML()+weekHTML()+`<div class="split"><div>
     ${od.length?`<div class="alert"><div><b>Просрочено: ${od.length}</b><small>${esc(od.slice(0,2).map(x=>x.title).join('; '))}${od.length>2?'…':''}</small></div>
       <button class="btn sm" onclick="moveOverdue()">Перенести на сегодня</button></div>`:''}
-    ${hg.length?`<section class="card holdBox"><div class="listHead"><h2>Висят</h2><span class="muted small">${hg.length}</span></div>${hg.map(x=>taskHTML(x,{date:true})).join('')}</section>`:''}
+    ${hg.length?`<section class="card holdBox"><button type="button" class="holdHead" onclick="holdOpen=!holdOpen;render()" aria-expanded="${holdOpen}"><h2>Висят</h2><span class="holdN">${hg.length}</span><span class="holdCh${holdOpen?' open':''}">${ic('right')}</span></button>${holdOpen?`<div class="holdList">${hg.map(x=>taskHTML(x,{date:true})).join('')}</div>`:''}</section>`:''}
     <section class="card">
       <div class="listHead"><h2>${selDate===t?'Задачи на сегодня':'Задачи на '+fmt(selDate)}</h2><span class="muted small">${list.filter(x=>x.done).length} из ${list.length}</span></div>
       ${list.length?list.map(x=>taskHTML(x)).join(''):`<div class="empty">${ic('inbox')}<b>На этот день пусто</b><p>Запишите, что нужно сделать, или выберите другой день.</p><button class="btn pri" onclick="openTask()">${ic('plus')}Добавить задачу</button></div>`}
