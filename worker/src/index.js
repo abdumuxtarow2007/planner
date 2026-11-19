@@ -5,6 +5,7 @@
 export default {
   async fetch(req, env) {
     const url = new URL(req.url);
+    if (url.pathname.startsWith('/hemis/')) return hemisRoute(req, env, url);
     const m = url.pathname.match(/^\/hook\/([0-9a-f-]{36})$/i);
     if (m && req.method === 'POST') return hook(req, env, m[1]);
     if (url.pathname === '/hook' && req.method === 'POST') return sharedHook(req, env);
@@ -146,10 +147,11 @@ const planPct = p => (p.steps.length ? Math.round(p.steps.filter(s => s.done).le
 function agendaText(c, D, d) {
   const a = dayRoutine(D, d).map(r => ({ kind: 'r', start: r.start, end: r.end || '', title: r.title, done: rIsDone(D, r.id, d) }))
     .concat(dayTasks(D, d).filter(t => t.time).map(t => ({ kind: 't', start: t.time, end: '', title: t.title, done: t.done })))
+    .concat((D.hemis || []).filter(l => l.date === d).map(l => ({ kind: 'h', start: l.start, end: l.end, title: l.title + (l.room ? ', ауд. ' + l.room : ''), done: false })))
     .sort((x, y) => x.start.localeCompare(y.start));
   if (!a.length) return '';
   return `<b>График на ${esc(d === c.t ? 'сегодня' : c.fmt(d))}</b>\n\n` +
-    a.map(x => (x.done ? '✅ ' : '🕒 ') + x.start + (x.end ? '–' + x.end : '') + ' ' + esc(x.title) + (x.kind === 't' ? ' <i>(задача)</i>' : '')).join('\n');
+    a.map(x => (x.done ? '✅ ' : '🕒 ') + x.start + (x.end ? '–' + x.end : '') + ' ' + esc(x.title) + (x.kind === 't' ? ' <i>(задача)</i>' : x.kind === 'h' ? ' <i>(пара)</i>' : '')).join('\n');
 }
 
 function taskKb(t) {
@@ -274,7 +276,7 @@ async function onMessage(env, bot, m) {
 
   const c = makeCtx(env, bot), t = c.t;
   const cmd = text.split(/\s+/)[0].toLowerCase().replace(/@.*$/, '');
-  const read = async () => (await loadData(env, c.uid)).data;
+  const read = async () => { const D = (await loadData(env, c.uid)).data; D.hemis = await hemisLessons(env, c.uid).catch(() => []); return D; };
   const sendList = async key => { const l = list(c, await read(), key); await c.send(l.text, l.kb); };
 
   if (cmd === '/start' || cmd === '/help') return c.send(HELP);
@@ -350,6 +352,7 @@ async function onCallback(env, bot, q) {
 
 /* ---------------- раз в минуту: сводка и напоминания ---------------- */
 async function tick(env) {
+  await hemisTick(env).catch(e => console.error('hemisTick', e && e.message));
   const bots = await sb(env, 'planner_bot?chat=not.is.null&select=*');
   await Promise.allSettled((bots || []).map(b => tickOne(env, b).catch(e => console.error('tick', b.user_id, e && e.message))));
 }
@@ -359,6 +362,7 @@ async function tickOne(env, bot) {
   const needDigest = bot.digest && bot.last_digest !== t && c.hm >= bot.digest_time;
   if (!needDigest && !bot.remind) return;
   const D = (await loadData(env, c.uid)).data;
+  D.hemis = await hemisLessons(env, c.uid).catch(() => []);
   const sent = { ...(bot.sent || {}) }, patch = {};
   const out = [];
 
@@ -381,6 +385,13 @@ async function tickOne(env, bot) {
       sent[key] = 1;
       if (diff <= 30 && !rIsDone(D, r.id, t)) out.push([`🕒 ${esc(r.start)}${r.end ? '–' + esc(r.end) : ''} по графику: <b>${esc(r.title)}</b>` + (r.note ? '\n' + esc(r.note) : '')]);
     }
+    /* пары из HEMIS: напоминаем за 15 минут до начала */
+    for (const l of D.hemis.filter(l => l.date === t)) {
+      const key = 'h:' + l.id + '|' + t + '|' + l.start, [h, m] = l.start.split(':').map(Number), diff = c.mins - (h * 60 + m - 15);
+      if (diff < 0 || sent[key]) continue;
+      sent[key] = 1;
+      if (diff <= 30) out.push([`🎓 ${esc(l.start)}–${esc(l.end)} пара: <b>${esc(l.title)}</b>` + [l.type, l.room && 'ауд. ' + l.room, l.teacher].filter(Boolean).map(x => '\n' + esc(x)).join('')]);
+    }
     for (const k in sent) if (!k.includes('|' + t + '|')) delete sent[k];
     if (JSON.stringify(sent) !== JSON.stringify(bot.sent || {})) patch.sent = sent;
   }
@@ -390,4 +401,173 @@ async function tickOne(env, bot) {
     try { await c.send(text, kb); }
     catch (e) { if (e.code === 403 || e.code === 401) { console.warn('bot blocked/invalid', c.uid, e.message); break; } throw e; }
   }
+}
+
+
+/* ---------------- HEMIS: расписание пар ----------------
+   Сайт присылает логин и пароль HEMIS один раз (POST /hemis/connect). Воркер входит в студенческий портал вуза,
+   забирает пары на ближайшие недели и хранит их в таблице planner_hemis. Дальше раз в 6 часов обновляет сам.
+   Пароль хранится только в зашифрованном виде (секрет HEMIS_KEY) и только если пользователь разрешил —
+   он нужен, чтобы заново войти, когда токен HEMIS истечёт. */
+const HEMIS_EVERY = 6 * 3600e3;
+const cors = { 'access-control-allow-origin': '*', 'access-control-allow-headers': 'authorization, content-type', 'access-control-allow-methods': 'POST, OPTIONS' };
+const jres = (o, status = 200) => new Response(JSON.stringify(o), { status, headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', ...cors } });
+
+async function hemisRoute(req, env, url) {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+  if (req.method !== 'POST') return jres({ error: 'method' }, 405);
+  /* кто спрашивает: проверяем токен сессии Supabase */
+  const jwt = (req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '');
+  const ur = jwt ? await fetch(env.SUPABASE_URL + '/auth/v1/user', { headers: { apikey: env.SUPABASE_SERVICE_KEY, Authorization: 'Bearer ' + jwt } }) : null;
+  if (!ur || !ur.ok) return jres({ error: 'Войдите в аккаунт ASMO заново.' }, 401);
+  const userId = (await ur.json()).id;
+  const body = await req.json().catch(() => ({}));
+  try {
+    if (url.pathname === '/hemis/connect') {
+      const base = hemisBase(body.base), login = String(body.login || '').trim(), password = String(body.password || '');
+      if (!base) return jres({ error: 'Адрес портала должен быть вида https://student.<вуз>.uz' }, 400);
+      if (!login || !password) return jres({ error: 'Введите логин и пароль HEMIS.' }, 400);
+      const token = await hemisLogin(base, login, password);
+      const lessons = await hemisFetch(base, token);
+      const pass = body.remember && env.HEMIS_KEY ? await seal(env, password) : '';
+      await sb(env, 'planner_hemis?on_conflict=user_id', { method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+        body: JSON.stringify({ user_id: userId, base, login, token, pass, lessons, synced_at: new Date().toISOString(), error: '' }) });
+      return jres({ ok: true, count: lessons.length, remember: !!pass });
+    }
+    if (url.pathname === '/hemis/sync') {
+      const row = (await sb(env, `planner_hemis?user_id=eq.${userId}&select=*`))[0];
+      if (!row) return jres({ error: 'HEMIS не подключён.' }, 404);
+      const r = await hemisSyncRow(env, row);
+      return r.error ? jres({ error: r.error }, 502) : jres({ ok: true, count: r.count });
+    }
+    if (url.pathname === '/hemis/disconnect') {
+      await sb(env, `planner_hemis?user_id=eq.${userId}`, { method: 'DELETE' });
+      return jres({ ok: true });
+    }
+    return jres({ error: 'not found' }, 404);
+  } catch (e) {
+    return jres({ error: e.user ? e.message : 'HEMIS не ответил: ' + String(e && e.message).slice(0, 200) }, e.user ? 400 : 502);
+  }
+}
+
+/* только студенческие порталы HEMIS, чтобы воркер нельзя было использовать как прокси куда угодно */
+function hemisBase(v) {
+  let s = String(v || '').trim().toLowerCase();
+  if (!s) return '';
+  if (!/^https?:\/\//.test(s)) s = 'https://' + s;
+  let u; try { u = new URL(s); } catch (e) { return ''; }
+  return /^student\.([a-z0-9-]+\.)*[a-z0-9-]+\.uz$/.test(u.hostname) ? 'https://' + u.hostname : '';
+}
+const uerr = m => Object.assign(new Error(m), { user: true });
+
+async function hemisJson(base, path, opt = {}) {
+  const r = await fetch(base + '/rest/v1/' + path, { ...opt, headers: { Accept: 'application/json', 'Content-Type': 'application/json', ...(opt.headers || {}) } });
+  const j = await r.json().catch(() => null);
+  if (r.status === 401 || r.status === 403) throw Object.assign(new Error('unauthorized'), { auth: true });
+  if (!r.ok || !j) throw new Error(path + ': HTTP ' + r.status);
+  if (j.success === false) throw new Error(path + ': ' + (j.error || j.message || 'ошибка'));
+  return j;
+}
+async function hemisLogin(base, login, password) {
+  let j;
+  try { j = await hemisJson(base, 'auth/login', { method: 'POST', body: JSON.stringify({ login, password }) }); }
+  catch (e) { if (e.auth || /auth\/login: /.test(e.message)) throw uerr('HEMIS не принял логин или пароль.'); throw e; }
+  const t = (j.data && (j.data.token || j.data.access_token)) || j.token;
+  if (!t) throw uerr('HEMIS не выдал токен. Проверьте логин и пароль.');
+  return String(t).replace(/^Bearer\s+/i, '');
+}
+
+/* пары текущей и двух следующих недель (плюс прошедшая — чтобы день назад тоже был виден) */
+async function hemisFetch(base, token) {
+  const H = { headers: { Authorization: 'Bearer ' + token } };
+  const now = Date.now() / 1000, rows = [];
+  let weeks = [], sem = '';
+  try {
+    const s = await hemisJson(base, 'education/semesters', H);
+    const list = Array.isArray(s.data) ? s.data : [];
+    const cur = list.find(x => x.current) || list[list.length - 1];
+    if (cur) {
+      sem = cur.code;
+      weeks = (cur.weeks || []).filter(w => w.end_date >= now - 7 * 86400 && w.start_date <= now + 21 * 86400).sort((a, b) => a.start_date - b.start_date).slice(0, 4);
+    }
+  } catch (e) { if (e.auth) throw e; }
+  if (weeks.length) {
+    for (const w of weeks) {
+      const j = await hemisJson(base, `education/schedule?semester=${encodeURIComponent(sem)}&week=${encodeURIComponent(w.id)}`, H);
+      rows.push(...(Array.isArray(j.data) ? j.data : []));
+    }
+  } else {
+    const j = await hemisJson(base, 'education/schedule', H);
+    rows.push(...(Array.isArray(j.data) ? j.data : []));
+  }
+  return normLessons(rows);
+}
+
+const nm = v => (v && typeof v === 'object' ? v.name || v.title || '' : v || '').toString().trim();
+const hhmm = v => { const m = String(v || '').match(/^(\d{1,2}):(\d{2})/); return m ? m[1].padStart(2, '0') + ':' + m[2] : ''; };
+function tashDate(sec) {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tashkent', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(sec * 1000));
+}
+function normLessons(rows) {
+  const out = new Map();
+  for (const r of rows) {
+    if (!r || !r.lesson_date) continue;
+    const p = r.lessonPair || {};
+    const l = {
+      date: tashDate(Number(r.lesson_date)), start: hhmm(p.start_time), end: hhmm(p.end_time),
+      title: nm(r.subject) || 'Занятие', type: nm(r.trainingType), room: nm(r.auditorium), teacher: nm(r.employee),
+    };
+    if (!l.start) continue;
+    l.id = 'h' + hash32([l.date, l.start, l.title, l.type, l.room].join('|'));
+    out.set(l.id, l);
+  }
+  return [...out.values()].sort((a, b) => (a.date + a.start).localeCompare(b.date + b.start));
+}
+function hash32(s) { let h = 2166136261; for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 16777619); return (h >>> 0).toString(36); }
+
+async function hemisSyncRow(env, row) {
+  let token = row.token, patch;
+  try {
+    let lessons;
+    try { lessons = await hemisFetch(row.base, token); }
+    catch (e) {
+      if (!e.auth) throw e;
+      /* токен истёк — входим заново, если пароль сохранён */
+      if (!row.pass || !env.HEMIS_KEY) throw uerr('Сессия HEMIS истекла. Войдите в HEMIS заново в разделе «График».');
+      token = await hemisLogin(row.base, row.login, await unseal(env, row.pass));
+      lessons = await hemisFetch(row.base, token);
+    }
+    patch = { token, lessons, synced_at: new Date().toISOString(), error: '' };
+  } catch (e) {
+    patch = { synced_at: new Date().toISOString(), error: e.user ? e.message : 'Не удалось обновить: ' + String(e.message).slice(0, 150) };
+  }
+  await sb(env, `planner_hemis?user_id=eq.${row.user_id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+  return patch.error ? { error: patch.error } : { count: patch.lessons.length };
+}
+
+async function hemisTick(env) {
+  const since = new Date(Date.now() - HEMIS_EVERY).toISOString();
+  const rows = await sb(env, `planner_hemis?synced_at=lt.${encodeURIComponent(since)}&select=*&limit=5`);
+  for (const r of rows || []) await hemisSyncRow(env, r).catch(e => console.error('hemis sync', r.user_id, e && e.message));
+}
+async function hemisLessons(env, uid) {
+  const row = (await sb(env, `planner_hemis?user_id=eq.${uid}&select=lessons`))[0];
+  return (row && row.lessons) || [];
+}
+
+/* шифрование пароля AES-GCM ключом из секрета HEMIS_KEY */
+async function aesKey(env) {
+  const raw = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(env.HEMIS_KEY));
+  return crypto.subtle.importKey('raw', raw, 'AES-GCM', false, ['encrypt', 'decrypt']);
+}
+const b64 = u => btoa(String.fromCharCode(...u));
+const unb64 = s => Uint8Array.from(atob(s), ch => ch.charCodeAt(0));
+async function seal(env, text) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const ct = new Uint8Array(await crypto.subtle.encrypt({ name: 'AES-GCM', iv }, await aesKey(env), new TextEncoder().encode(text)));
+  return b64(iv) + '.' + b64(ct);
+}
+async function unseal(env, s) {
+  const [iv, ct] = s.split('.').map(unb64);
+  return new TextDecoder().decode(await crypto.subtle.decrypt({ name: 'AES-GCM', iv }, await aesKey(env), ct));
 }

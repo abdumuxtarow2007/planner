@@ -518,6 +518,10 @@ body{background:var(--ground);color:var(--ink)}
 .ag.skip{opacity:.75}.ag.skip .tt{text-decoration:line-through;color:var(--muted)}
 .ag.skip .agT{color:var(--muted);text-decoration:line-through}
 .chip.rxc{background:#faf0da;color:#7a5200}
+.chip.hmc{background:#e8eefb;color:#2a4a8a}
+.ag .hmIc{width:22px;flex:none;text-align:center;font-size:16px;line-height:22px}
+.hmf{display:grid;gap:8px;margin:4px 0 10px}
+.hmf label{font-size:13px;font-weight:600;color:var(--muted)}
 .rxAlt{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:16px}
 .rxAdd{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:10px;padding:11px;border:1.5px dashed #c3cac5;border-radius:14px;background:none;font:inherit;font-weight:600;font-size:14px;color:var(--muted);cursor:pointer}
 .rxAdd:hover{border-color:var(--acc);color:var(--acc);background:#f3f7f4}
@@ -1354,7 +1358,7 @@ function auEnter(){
   let owner='';try{owner=localStorage.getItem(OWKEY)||''}catch(e){}
   if(owner&&owner!==AU.uid)wipeLocal();          /* на устройстве были данные другого аккаунта */
   try{localStorage.setItem(OWKEY,AU.uid)}catch(e){}
-  $('auPass').value='';$('auCode').value='';auGate();view='day';render();syPending=true;syRun();tgLoad();
+  $('auPass').value='';$('auCode').value='';auGate();view='day';render();syPending=true;syRun();tgLoad();hmLoad();
 }
 function accUpd(){
   if(!AU)return;
@@ -1367,7 +1371,7 @@ function auLogout(){openAcc()}
 async function doLogout(){
   const b=$('accOut');if(b)b.disabled=true;
   try{await sb('/auth/v1/logout',{method:'POST'})}catch(e){}
-  AU=null;auSave();try{localStorage.removeItem(OWKEY)}catch(e){}
+  AU=null;auSave();try{localStorage.removeItem(OWKEY)}catch(e){}HM=null;hmStore();
   wipeLocal();tgRun++;if(tgAbort)tgAbort.abort();TG={...TG0};tgSave();tgStatus='off';
   if($('dlgAcc').open)$('dlgAcc').close();if(b)b.disabled=false;
   auGate();render();
@@ -1405,7 +1409,7 @@ function syCard(){
     <p class="muted" style="margin:10px 0 14px">Задачи, планы и график привязаны к аккаунту. Войдите с той же почтой на другом устройстве — всё появится там само.</p>
     <div class="row"><button class="btn pri" onclick="syPending=true;syRun()">Синхронизировать сейчас</button><button class="btn danger" onclick="auLogout()">Выйти</button></div></section>`;
 }
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')syRun()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){syRun();hmLoad()}});
 window.addEventListener('focus',()=>syRun());
 setInterval(()=>{if(document.visibilityState==='visible')syRun()},45000);
 
@@ -1442,6 +1446,7 @@ function toggleR(id,d){
 function agenda(d,withSkip){
   const items=(withSkip?dayRoutineX(d):dayRoutine(d)).map(r=>({kind:'r',id:r.id,start:r.start,end:r.end||'',title:r.title,note:r.note||'',done:rIsDone(r.id,d),skip:!!r.skip,changed:!!r.changed,added:!!r.added,orig:r.orig}))
     .concat(dayTasks(d).filter(t=>t.time).map(t=>({kind:'t',id:t.id,start:t.time,end:'',title:t.title,note:'',done:t.done})))
+    .concat(hmDay(d).map(l=>({kind:'h',id:l.id,start:l.start,end:l.end,title:l.title,note:[l.type,l.room&&'ауд. '+l.room,l.teacher].filter(Boolean).join(' · '),done:false})))
     .sort((a,b)=>a.start.localeCompare(b.start));
   if(d===today()){
     const hm=nowHM();
@@ -1458,6 +1463,10 @@ function agendaHTML(d){
     <div class="agT">${esc(x.start)}${x.end?`<small>${esc(x.end)}</small>`:''}</div>
     <div class="tb"><div class="tt">${esc(x.title)}</div><span class="chip">отменено на этот день</span></div>
     <div class="ta show"><button class="btn sm" onclick="rxRestore('${d}','${x.id}')">Вернуть</button></div></div>`
+  :x.kind==='h'?`<div class="ag ${x.state} hm">
+    <div class="agT">${esc(x.start)}<small>${esc(x.end)}</small></div>
+    <span class="hmIc" aria-hidden="true">🎓</span>
+    <div class="tb"><div class="tt">${esc(x.title)}</div>${x.state==='now'?'<span class="chip ok">сейчас</span> ':''}<span class="chip hmc">пара · HEMIS</span>${x.note?`<div class="tn">${esc(x.note)}</div>`:''}</div></div>`
   :`<div class="ag ${x.state} ${x.done?'done':''}">
     <div class="agT">${esc(x.start)}${x.end?`<small>${esc(x.end)}</small>`:''}</div>
     <button class="chk" aria-label="${x.done?'Снять отметку':'Отметить сделанным'}" onclick="${x.kind==='r'?`toggleR('${x.id}','${d}')`:`toggleTask('${x.id}')`}">${ic('chk')}</button>
@@ -1565,18 +1574,87 @@ function viewSched(){
   const td=dow(today());
   const chips=`<div class="dchips">${WD.map((w,i)=>{const n=S.routine.filter(r=>r.days.includes(i+1)).length;
     return `<button class="${schedDay===i+1?'on':''} ${td===i+1?'today':''}" onclick="schedDay=${i+1};render()">${w}<small>${n||'·'}</small></button>`}).join('')}</div>`;
-  if(!S.routine.length)return chips+`<section class="card empty">${ic('clock')}<b>График пока пуст</b><p>Запишите свой обычный день: во сколько подъём, работа, обед, спорт. Пункты повторяются по выбранным дням недели.</p><button class="btn pri" onclick="openR()">${ic('plus')}Добавить первый пункт</button></section>`;
+  const hm=hmCard(),hl=hmSchedList();
+  if(!S.routine.length)return chips+hm+hl+`<section class="card empty">${ic('clock')}<b>График пока пуст</b><p>Запишите свой обычный день: во сколько подъём, работа, обед, спорт. Пункты повторяются по выбранным дням недели.</p><button class="btn pri" onclick="openR()">${ic('plus')}Добавить первый пункт</button></section>`;
   const list=S.routine.filter(r=>r.days.includes(schedDay)).sort((a,b)=>a.start.localeCompare(b.start));
-  return chips+`<section class="card" style="max-width:720px"><div class="listHead"><h2>${['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'][schedDay-1]}</h2><span class="muted small">${list.length?'пунктов: '+list.length:''}</span></div>
+  return chips+hm+hl+`<section class="card" style="max-width:720px"><div class="listHead"><h2>${['Понедельник','Вторник','Среда','Четверг','Пятница','Суббота','Воскресенье'][schedDay-1]}</h2><span class="muted small">${list.length?'пунктов: '+list.length:''}</span></div>
     ${list.length?list.map(r=>`<div class="ag next rEdit" role="button" tabindex="0" title="Нажмите, чтобы изменить" onclick="openR('${r.id}',${schedDay})" onkeydown="if(event.key==='Enter')openR('${r.id}',${schedDay})"><div class="agT">${esc(r.start)}${r.end?`<small>${esc(r.end)}</small>`:''}</div>
       <div class="tb"><div class="tt">${esc(r.title)}</div><div class="tm"><span>${esc(daysLabel(r.days))}</span></div>${r.note?`<div class="tn">${esc(r.note)}</div>`:''}</div>
       <div class="ta show"><button class="ib" title="Изменить" onclick="event.stopPropagation();openR('${r.id}',${schedDay})">${ic('edit')}</button><button class="ib" title="${r.days.length>1?'Убрать из этого дня':'Удалить'}" onclick="event.stopPropagation();delR('${r.id}',${schedDay})">${ic('trash')}</button></div></div>`).join('')
     :'<p class="muted" style="margin:10px 0 4px">На этот день недели пунктов нет.</p>'}</section>
     <p class="muted small" style="max-width:720px;margin:12px 4px 0">Нажмите на пункт, чтобы изменить время, название или дни. Изменение можно применить ко всем дням или только к выбранному. График показывается на главном экране в карточке «График дня». Если подключён бот, он напоминает о каждом пункте в его время и присылает график по команде /schedule.</p>`;
 }
+/* ======================= пары из HEMIS ======================= */
+/* Вход в HEMIS и загрузка пар идут через воркер asmo-bot (браузер напрямую к порталу вуза не пускают — CORS).
+   Пары хранятся в Supabase (таблица planner_hemis), воркер обновляет их сам раз в 6 часов. */
+const HMKEY='planner_hemis_v1';
+let HM=null,hmBusy=false,hmErr='',hmF={base:'student.tstu.uz',login:''};
+try{HM=JSON.parse(localStorage.getItem(HMKEY)||'null')}catch(e){HM=null}
+const hmDay=d=>HM&&Array.isArray(HM.lessons)?HM.lessons.filter(l=>l.date===d):[];
+function hmStore(){try{if(HM)localStorage.setItem(HMKEY,JSON.stringify(HM));else localStorage.removeItem(HMKEY)}catch(e){}}
+async function hmLoad(){
+  if(!AU){if(HM){HM=null;hmStore();softRender()}return}
+  try{
+    const r=await sb('/rest/v1/planner_hemis?select=base,login,lessons,synced_at,error');
+    if(!r.ok)return;
+    const row=(await r.json())[0]||null,was=JSON.stringify(HM);
+    HM=row;hmStore();if(JSON.stringify(HM)!==was)softRender();
+  }catch(e){}
+}
+async function hmCall(path,body){
+  if(AU&&AU.exp-60<Date.now()/1000)await auRefresh();
+  if(!AU)throw new Error('Войдите в аккаунт ASMO.');
+  const r=await fetch(BOT_URL+'/hemis/'+path,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+AU.access},body:JSON.stringify(body||{})});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok)throw new Error(j.error||'Сервер не ответил ('+r.status+')');
+  return j;
+}
+async function hmConnect(){
+  const base=$('hmBase').value.trim(),login=$('hmLogin').value.trim(),password=$('hmPass').value,remember=$('hmRem').checked;
+  hmF={base,login};
+  if(!login||!password){hmErr='Введите логин и пароль HEMIS.';render();return}
+  hmBusy=true;hmErr='';render();
+  try{const j=await hmCall('connect',{base,login,password,remember});await hmLoad();toast('HEMIS подключён, пар загружено: '+j.count)}
+  catch(e){hmErr=e.message}
+  hmBusy=false;render();
+}
+async function hmSync(){
+  hmBusy=true;hmErr='';render();
+  try{const j=await hmCall('sync');toast('Расписание обновлено, пар: '+j.count)}catch(e){hmErr=e.message}
+  await hmLoad();hmBusy=false;render();
+}
+async function hmDisconnect(){
+  if(!confirm('Отключить HEMIS? Пары пропадут из графика, сохранённый пароль удалится.'))return;
+  try{await hmCall('disconnect');HM=null;hmStore();toast('HEMIS отключён')}catch(e){toast(e.message)}
+  render();
+}
+function hmCard(){
+  if(!AU)return '';
+  const err=hmErr?`<p class="small" style="color:var(--pome);margin:8px 0 0">${esc(hmErr)}</p>`:'';
+  if(!HM)return `<section class="card" style="max-width:720px;margin-bottom:14px"><h2>Пары из HEMIS</h2>
+    <p class="muted" style="margin:0 0 10px">Войдите в студенческий кабинет HEMIS — пары появятся в графике дня, а бот будет напоминать о них за 15 минут.</p>
+    <div class="hmf"><label for="hmBase">Портал вуза</label><input type="text" id="hmBase" value="${esc(hmF.base)}" autocomplete="off">
+    <label for="hmLogin">Логин HEMIS</label><input type="text" id="hmLogin" value="${esc(hmF.login)}" autocomplete="username">
+    <label for="hmPass">Пароль HEMIS</label><input type="password" id="hmPass" autocomplete="current-password" onkeydown="if(event.key==='Enter')hmConnect()"></div>
+    <label class="opt" style="border-top:0;font-weight:500"><input type="checkbox" id="hmRem" checked><span>Запомнить пароль, чтобы расписание обновлялось само. Он хранится в зашифрованном виде.</span></label>
+    <div class="row"><button class="btn pri" ${hmBusy?'disabled':''} onclick="hmConnect()">${hmBusy?'Подключаю…':'Подключить HEMIS'}</button></div>${err}</section>`;
+  const t=new Date(HM.synced_at),ago=String(t.getDate()).padStart(2,'0')+'.'+String(t.getMonth()+1).padStart(2,'0')+' '+String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0');
+  return `<section class="card" style="max-width:720px;margin-bottom:14px"><div class="listHead"><h2>Пары из HEMIS</h2><span class="muted small">${esc(HM.base.replace('https://',''))}</span></div>
+    <div class="tgst ${HM.error?'bad':'ok'}"><i></i><span>${HM.error?esc(HM.error):'Обновлено '+ago+' · пар загружено: '+HM.lessons.length}</span></div>
+    <div class="row" style="margin-top:12px"><button class="btn" ${hmBusy?'disabled':''} onclick="hmSync()">${hmBusy?'Обновляю…':'Обновить сейчас'}</button><button class="btn danger" onclick="hmDisconnect()">Отключить</button></div>${err}</section>`;
+}
+/* пары на выбранный день недели — текущая неделя */
+function hmSchedList(){
+  if(!HM||!HM.lessons.length)return '';
+  const t=today(),d=addDays(t,schedDay-dow(t)),l=hmDay(d);
+  return `<section class="card" style="max-width:720px;margin-bottom:14px"><div class="listHead"><h2>Пары, ${esc(fmt(d))}</h2><span class="muted small">${l.length?'пар: '+l.length:''}</span></div>
+    ${l.length?l.map(x=>`<div class="ag next hm"><div class="agT">${esc(x.start)}<small>${esc(x.end)}</small></div><span class="hmIc" aria-hidden="true">🎓</span>
+      <div class="tb"><div class="tt">${esc(x.title)}</div><div class="tn">${esc([x.type,x.room&&'ауд. '+x.room,x.teacher].filter(Boolean).join(' · '))}</div></div></div>`).join('')
+    :'<p class="muted" style="margin:10px 0 4px">В этот день пар нет.</p>'}</section>`;
+}
 function tgAgenda(d){
   const a=agenda(d);if(!a.length)return '';
-  return `<b>График на ${esc(d===today()?'сегодня':fmt(d))}</b>\n\n`+a.map(x=>(x.done?'✅ ':'🕒 ')+x.start+(x.end?'–'+x.end:'')+' '+esc(x.title)+(x.kind==='t'?' <i>(задача)</i>':'')).join('\n');
+  return `<b>График на ${esc(d===today()?'сегодня':fmt(d))}</b>\n\n`+a.map(x=>(x.done?'✅ ':'🕒 ')+x.start+(x.end?'–'+x.end:'')+' '+esc(x.title)+(x.kind==='t'?' <i>(задача)</i>':x.kind==='h'?' <i>(пара)</i>':'')).join('\n');
 }
 function printOut(h){
   $('printRoot').innerHTML=h;$('dlgExport').close();
@@ -1880,7 +1958,7 @@ function render(){
   if(view==='done')renderDoneList();
 }
 ['dlgTask','dlgPlan','dlgExport','dlgMove','dlgR','dlgExp','dlgRX'].forEach(id=>$(id).addEventListener('click',e=>{if(e.target.id===id)e.target.close()}));
-syLoad();auLoad();load();save();render();auGate();auMode();auFromLink();syRun();tgLoad();
+syLoad();auLoad();load();save();render();auGate();auMode();auFromLink();syRun();tgLoad();hmLoad();
 
 /* ======== свои выпадающие списки ======== */
 (function(){
