@@ -129,7 +129,7 @@ function makeCtx(env, bot) {
 }
 
 const sortT = (a, b) => (a.done - b.done) || ((a.time || '99:99').localeCompare(b.time || '99:99')) || (a.prio - b.prio) || ((a.created || 0) - (b.created || 0));
-const dayTasks = (D, d) => D.tasks.filter(t => t.date === d);
+const dayTasks = (D, d) => D.tasks.filter(t => t.date === d && !(t.hold && !t.done));
 const dayRoutine = (D, d) => {
   const ov = (D.rx || []).filter(x => x.date === d), out = [];
   for (const r of D.routine) {
@@ -161,7 +161,7 @@ function taskKb(t) {
 
 function list(c, D, key) {
   const t = c.t, od = key === 'od';
-  const items = od ? D.tasks.filter(x => !x.done && x.date < t).sort((a, b) => a.date.localeCompare(b.date)) : dayTasks(D, key).sort(sortT);
+  const items = od ? D.tasks.filter(x => !x.done && !x.hold && x.date < t).sort((a, b) => a.date.localeCompare(b.date)) : dayTasks(D, key).sort(sortT);
   const head = od ? 'Просроченные' : (key === t ? 'Сегодня, ' + c.fmt(key) : key === addDays(t, 1) ? 'Завтра, ' + c.fmt(key) : c.fmtLong(key));
   if (!items.length) return { text: `<b>${esc(head)}</b>\n\n${od ? 'Просроченных задач нет.' : 'Задач нет. Напишите мне текст — добавлю задачу.'}`, kb: null };
   const lines = items.map(x => x.done ? '✅ <s>' + esc(x.title) + '</s>'
@@ -357,6 +357,32 @@ async function tick(env) {
   await Promise.allSettled((bots || []).map(b => tickOne(env, b).catch(e => console.error('tick', b.user_id, e && e.message))));
 }
 
+/* ---------------- напоминания записать расходы и доходы ----------------
+   Четыре раза в день (по времени пользователя). Тихо пропускаем, если человек только что сам что-то записал,
+   и не пишем тем, кто ни разу не пользовался разделом «Финансы». Включаются вместе с напоминаниями о задачах. */
+const FIN_TIMES = ['09:00', '14:10', '18:30', '22:30'];
+const SITE_URL = 'https://abdumuxtarow2007.github.io/planner/';
+const fmMoney = n => Math.round(n).toLocaleString('ru-RU').replace(/\u00a0|\u202f/g, ' ');
+function finReminders(c, D, t, sent, out) {
+  if (!D.exp.length) return;
+  for (const hm of FIN_TIMES) {
+    const key = 'f|' + t + '|' + hm, [h, m] = hm.split(':').map(Number), diff = c.mins - (h * 60 + m);
+    if (diff < 0 || sent[key]) continue;
+    sent[key] = 1;
+    if (diff > 30) continue;
+    const td = D.exp.filter(x => x.date === t);
+    if (td.some(x => Date.now() - (x.created || 0) < 3600e3)) continue;
+    const spent = td.filter(x => x.kind !== 'inc').reduce((a, x) => a + (+x.amt || 0), 0);
+    const got = td.filter(x => x.kind === 'inc').reduce((a, x) => a + (+x.amt || 0), 0);
+    let text;
+    if (!td.length) text = hm === '22:30' ? '🌙 За сегодня нет ни одной записи о финансах. Закройте день: запишите всё, что тратили или получали.'
+      : hm === '09:00' ? '☀️ Новый день. Если вчера что-то не записали, самое время. Сегодня записывайте траты сразу.'
+      : '💸 Сегодня ещё нет записей о финансах. Что потратили или получили? Запишите, пока помните.';
+    else text = (hm === '22:30' ? '🌙 Итог дня: ' : '💸 Записано сегодня: ') + 'расходы ' + fmMoney(spent) + ' сум, доходы ' + fmMoney(got) + ' сум (записей: ' + td.length + ').\n' + (hm === '22:30' ? 'Всё ли записано?' : 'Есть что добавить?');
+    out.push([text, [[{ text: 'Записать в ASMO', url: SITE_URL }]]]);
+  }
+}
+
 async function tickOne(env, bot) {
   const c = makeCtx(env, bot), t = c.t;
   const needDigest = bot.digest && bot.last_digest !== t && c.hm >= bot.digest_time;
@@ -368,7 +394,7 @@ async function tickOne(env, bot) {
 
   if (needDigest) {
     patch.last_digest = t;
-    const l = list(c, D, t), od = D.tasks.filter(x => !x.done && x.date < t).length, ag = agendaText(c, D, t);
+    const l = list(c, D, t), od = D.tasks.filter(x => !x.done && !x.hold && x.date < t).length, ag = agendaText(c, D, t);
     out.push(['Доброе утро! План на день.\n\n' + (ag ? ag + '\n\n' : '') + l.text + (od ? `\n\nПросроченных задач: ${od}. Посмотреть: /overdue` : ''), l.kb]);
   }
   if (bot.remind) {
@@ -392,6 +418,7 @@ async function tickOne(env, bot) {
       sent[key] = 1;
       if (diff <= 30) out.push([`🎓 ${esc(l.start)}–${esc(l.end)} пара: <b>${esc(l.title)}</b>` + [l.type, l.room && 'ауд. ' + l.room, l.teacher].filter(Boolean).map(x => '\n' + esc(x)).join('')]);
     }
+    finReminders(c, D, t, sent, out);
     for (const k in sent) if (!k.includes('|' + t + '|')) delete sent[k];
     if (JSON.stringify(sent) !== JSON.stringify(bot.sent || {})) patch.sent = sent;
   }
