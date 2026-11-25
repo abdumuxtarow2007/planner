@@ -578,6 +578,15 @@ body{background:var(--ground);color:var(--ink)}
   .msTile .dot{margin-left:auto;width:9px;height:9px;border-radius:50%;background:var(--saffron)}
   .msTile .dot.ok{background:#2bb673}.msTile .dot.bad{background:var(--pome)}
 }
+.fDayCard{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;padding:14px 16px}
+.fDayCard.warn{background:var(--saffron-soft);border-color:#f3d89a}
+.fdT{display:grid;gap:2px;min-width:0}.fdT b{font-size:15px}.fdT small{color:var(--muted);font-size:13px}
+.fdB{display:flex;gap:8px;flex:none}
+.fRep{margin-top:14px}
+.fab{position:fixed;right:16px;bottom:calc(84px + env(safe-area-inset-bottom));z-index:18;display:flex;align-items:center;gap:8px;border:0;border-radius:999px;background:#1d2420;color:#fff;font:700 14px var(--sans);padding:12px 18px 12px 14px;box-shadow:0 12px 28px -10px rgba(20,28,24,.55);cursor:pointer}
+.fab svg.i{width:20px;height:20px;color:#fff}
+@media (min-width:761px){.fab{right:32px;bottom:32px}}
+@media (max-width:520px){.fDayCard{flex-direction:column;align-items:stretch}.fdB .btn{flex:1;justify-content:center}}
 </style>
 </head>
 <body>
@@ -886,7 +895,7 @@ function toast(m,undo){
 }
 
 /* ======================= навигация ======================= */
-function go(v){view=v;moreOpen=false;render();window.scrollTo(0,0);if(v==='bot'&&AU)tgLoad();else tgPollUpd()}
+function go(v){view=v;moreOpen=false;if(v==='exp')expDate=today();render();if(v==='exp'&&innerWidth>760)setTimeout(()=>{const a=$('xAmt');if(a)a.focus({preventScroll:true})},60);window.scrollTo(0,0);if(v==='bot'&&AU)tgLoad();else tgPollUpd()}
 let moreOpen=false;
 function toggleMore(){moreOpen=!moreOpen;renderNav()}
 function closeMore(){if(moreOpen){moreOpen=false;renderNav()}}
@@ -1058,7 +1067,7 @@ function viewDay(){
   const hg=S.tasks.filter(x=>!x.done&&x.hold).sort((a,b)=>a.date.localeCompare(b.date)),open=S.tasks.filter(x=>!x.done),c={1:0,2:0,3:0};open.forEach(x=>c[x.prio]++);
   const tot=open.length||1,col={1:'var(--pome)',2:'var(--saffron)',3:'var(--lapis)'};
   const plans=S.plans.slice(0,3);
-  return heroHTML()+weekHTML()+`<div class="split"><div>
+  return heroHTML()+weekHTML()+finDayCard()+`<div class="split"><div>
     ${od.length?`<div class="alert"><div><b>Просрочено: ${od.length}</b><small>${esc(od.slice(0,2).map(x=>x.title).join('; '))}${od.length>2?'…':''}</small></div>
       <button class="btn sm" onclick="moveOverdue()">Перенести на сегодня</button></div>`:''}
     ${hg.length?`<section class="card holdBox"><button type="button" class="holdHead" onclick="holdOpen=!holdOpen;render()" aria-expanded="${holdOpen}"><h2>Висят</h2><span class="holdN">${hg.length}</span><span class="holdCh${holdOpen?' open':''}">${ic('right')}</span></button>${holdOpen?`<div class="holdList">${hg.map(x=>taskHTML(x,{date:true})).join('')}</div>`:''}</section>`:''}
@@ -1949,6 +1958,7 @@ function viewExp(){
         <div class="xChips" id="xChips" role="group" aria-label="Категория">${chips}</div>
         <div class="fRow"><input id="xDt" type="date" value="${expDate}" aria-label="Дата" onchange="expDate=this.value||expDate"><input id="xNote" type="text" maxlength="120" autocomplete="off" placeholder="${isI?'От кого или за что (необязательно)':'На что потратили (необязательно)'}"><button type="submit" class="btn pri">${ic('plus')}${isI?'Добавить доход':'Добавить расход'}</button></div>
       </form>
+      ${finQuickHTML()}
       <p class="fHint">Сегодня потрачено <b>${money(expSum(t,t))}</b> сум · за неделю <b>${money(expSum(wa,wb))}</b> сум</p>
     </section>
     <div class="two">
@@ -2122,11 +2132,71 @@ function viewHl(){
 }
 
 
+/* ======================= быстрый ввод доходов и расходов ======================= */
+let fqType='exp',fqCat='food',fqInc='salary';
+const hhmm=d=>String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');
+function finStreak(){const ds=new Set(S.exp.map(x=>x.date));let d=today(),n=0;if(!ds.has(d))d=addDays(d,-1);while(ds.has(d)){n++;d=addDays(d,-1)}return n}
+function finFreq(){
+  const c={};S.exp.forEach(x=>{const k=(isInc(x)?'i':'e')+'|'+x.cat+'|'+(x.note||'')+'|'+x.amt;(c[k]=c[k]||{n:0,x}).n++;if((x.created||0)>(c[k].x.created||0))c[k].x=x});
+  return Object.values(c).sort((a,b)=>b.n-a.n||(b.x.created||0)-(a.x.created||0)).slice(0,6).map(o=>o.x);
+}
+function finPush(x,msg){
+  const id=uid(),inc=isInc(x);
+  S.exp.push({id,amt:x.amt,cat:x.cat,note:x.note||'',date:today(),time:hhmm(new Date()),created:Date.now(),...(inc?{kind:'inc'}:{})});
+  finMonth=today().slice(0,7);expDate=today();
+  const d=$('dlgFq');if(d&&d.open)d.close();
+  save();render();toast(msg,()=>{const j=S.exp.findIndex(e=>e.id===id);if(j>=0)S.exp.splice(j,1)});
+}
+function finRepeat(i){const x=finFreq()[i];if(!x)return;finPush(x,(isInc(x)?'Доход записан: +':'Расход записан: ')+money(x.amt)+' сум')}
+function finRepHTML(label,fn){
+  const fq=finFreq();if(!fq.length)return '';
+  return `<div class="fRep"><p class="muted small" style="margin:0 0 6px">${label}</p><div class="xChips">${fq.map((x,i)=>{const c=fcat(isInc(x)?'inc':'exp',x.cat);return `<button type="button" class="xChip" style="--c:${c[2]}" onclick="finRepeat(${i})"><i></i>${esc(x.note||c[1])} · ${isInc(x)?'+':''}${money(x.amt)}</button>`}).join('')}</div></div>`;
+}
+function finQuickHTML(){
+  const st=finStreak();
+  return finRepHTML('Повторить одним нажатием:')+(st>1?`<p class="fHint" style="margin-top:12px">Записываете <b>${st}</b> дн. подряд. Так держать!</p>`:'');
+}
+function finDayCard(){
+  const t=today(),td=S.exp.filter(x=>x.date===t),o=td.filter(x=>!isInc(x)).reduce((a,x)=>a+(+x.amt||0),0),i=td.filter(isInc).reduce((a,x)=>a+(+x.amt||0),0),st=finStreak(),late=new Date().getHours()>=15,none=!td.length;
+  return `<section class="card fDayCard${none&&late?' warn':''}"><div class="fdT"><b>${none?'Сегодня ещё нет записей':'Финансы сегодня'}</b><small>${none?(late?'Запишите траты, пока не забыли':'Записывайте траты сразу, так проще'):'Расходы '+money(o)+' · доходы '+money(i)}${st>1?' · серия '+st+' дн.':''}</small></div><div class="fdB"><button class="btn sm" onclick="openFinQ('exp')">${ic('plus')}Расход</button><button class="btn sm" onclick="openFinQ('inc')">${ic('plus')}Доход</button></div></section>`;
+}
+function fabUpd(){
+  let b=$('fab');if(!b){b=document.createElement('button');b.id='fab';b.type='button';b.className='fab';b.setAttribute('aria-label','Быстро записать расход или доход');b.onclick=()=>openFinQ('exp');b.innerHTML=ic('plus')+'<span>Записать</span>';document.body.appendChild(b)}
+  b.classList.toggle('hide',['exp','bot','data'].includes(view));
+}
+function openFinQ(k){
+  fqType=k||'exp';
+  let d=$('dlgFq');if(!d){d=document.createElement('dialog');d.id='dlgFq';document.body.appendChild(d);d.addEventListener('click',e=>{if(e.target===d)d.close()})}
+  fqDraw();d.showModal();setTimeout(()=>{const a=$('fqAmt');if(a)a.focus()},40);
+}
+function fqSet(k){const a=$('fqAmt'),n=$('fqNote'),av=a?a.value:'',nv=n?n.value:'';fqType=k;fqDraw();$('fqAmt').value=av;$('fqNote').value=nv;$('fqAmt').focus()}
+function fqCatSet(id,b){if(fqType==='inc')fqInc=id;else fqCat=id;document.querySelectorAll('#fqChips .xChip').forEach(e=>e.classList.toggle('on',e===b))}
+function fqDraw(){
+  const d=$('dlgFq'),inc=fqType==='inc',cur=inc?fqInc:fqCat;
+  d.innerHTML=`<form onsubmit="event.preventDefault();fqAdd()">
+    <h2>${inc?'Новый доход':'Новый расход'}</h2>
+    <div class="fg">
+      <div class="fSeg" role="group" aria-label="Тип операции"><button type="button" class="${inc?'':'on'}" onclick="fqSet('exp')">Расход</button><button type="button" class="${inc?'on inc':''}" onclick="fqSet('inc')">Доход</button></div>
+      <label class="xAmt"><input id="fqAmt" type="text" inputmode="numeric" autocomplete="off" placeholder="0" aria-label="Сумма" oninput="expFmtIn(this)"><span>сум</span></label>
+      <div class="xChips" id="fqChips" role="group" aria-label="Категория">${fcats(fqType).map(([id,n,c])=>`<button type="button" class="xChip${cur===id?' on':''}" style="--c:${c}" onclick="fqCatSet('${id}',this)"><i></i>${esc(n)}</button>`).join('')}</div>
+      <input id="fqNote" type="text" maxlength="120" autocomplete="off" placeholder="${inc?'От кого или за что (необязательно)':'На что потратили (необязательно)'}">
+      ${finRepHTML('Повторить недавнее:')}
+    </div>
+    <div class="dFoot"><button type="button" class="btn" onclick="$('dlgFq').close()">Отмена</button><button type="submit" class="btn pri">Добавить</button></div>
+  </form>`;
+}
+function fqAdd(){
+  const a=$('fqAmt'),n=expNum(a.value);if(!n){a.focus();toast('Введите сумму');return}
+  const inc=fqType==='inc';
+  finPush({amt:n,cat:inc?fqInc:fqCat,note:$('fqNote').value.trim(),...(inc?{kind:'inc'}:{})},(inc?'Доход записан: +':'Расход записан: ')+money(n)+' сум');
+}
+
+
 /* ======================= отрисовка ======================= */
 function render(){
   renderNav();
   const T={day:'ASMO',sched:'График',plans:'Планы',done:'Выполнено',exp:'Финансы',hl:'Здоровье',bot:'Телеграм-бот',data:'Данные'};
-  $('title').textContent=T[view];
+  $('title').textContent=T[view];fabUpd();
   const pdf=`<button class="btn" onclick="dlgExport.showModal()">${ic('dl')}PDF</button>`;
   $('acts').innerHTML=pdf+(view==='day'?`<button class="btn pri" onclick="openTask()">${ic('plus')}Задача</button>`:view==='plans'?`<button class="btn pri" onclick="openPlan()">${ic('plus')}План</button>`:view==='sched'?`<button class="btn pri" onclick="openR()">${ic('plus')}Пункт</button>`:'');
   $('view').innerHTML=view==='day'?viewDay():view==='plans'?viewPlans():view==='sched'?viewSched():view==='done'?viewDone():view==='exp'?viewExp():view==='hl'?viewHl():view==='bot'?viewBot():viewData();
