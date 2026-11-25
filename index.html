@@ -587,6 +587,7 @@ body{background:var(--ground);color:var(--ink)}
 .fab svg.i{width:20px;height:20px;color:#fff}
 @media (min-width:761px){.fab{right:32px;bottom:32px}}
 @media (max-width:520px){.fDayCard{flex-direction:column;align-items:stretch}.fdB .btn{flex:1;justify-content:center}}
+.fWipe{text-align:center;margin-top:6px}.linkBtn.dng{color:var(--pome);margin:0}
 </style>
 </head>
 <body>
@@ -1968,6 +1969,7 @@ function viewExp(){
       </section>
       <div class="stack">${brk('exp','Расходы по категориям','Расходов в этом месяце ещё нет.')}${brk('inc','Доходы по источникам','')}</div>
     </div>
+    ${S.exp.length?`<div class="fWipe"><button type="button" class="linkBtn dng" onclick="finWipeAsk()">Очистить все доходы и расходы…</button></div>`:''}
   </div>`;
 }
 function addExp(){
@@ -2189,6 +2191,31 @@ function fqAdd(){
   const a=$('fqAmt'),n=expNum(a.value);if(!n){a.focus();toast('Введите сумму');return}
   const inc=fqType==='inc';
   finPush({amt:n,cat:inc?fqInc:fqCat,note:$('fqNote').value.trim(),...(inc?{kind:'inc'}:{})},(inc?'Доход записан: +':'Расход записан: ')+money(n)+' сум');
+}
+
+
+/* ======================= очистка финансов ======================= */
+function finCsv(){
+  const q=s=>'"'+String(s==null?'':s).replace(/"/g,'""')+'"';
+  const rows=[...S.exp].sort((a,b)=>a.date.localeCompare(b.date)||(a.time||'').localeCompare(b.time||'')).map(x=>[x.date,x.time||'',isInc(x)?'Доход':'Расход',fcat(isInc(x)?'inc':'exp',x.cat)[1],x.amt,x.note||''].map(q).join(';'));
+  const csv='﻿'+['Дата','Время','Тип','Категория','Сумма','Заметка'].map(q).join(';')+'\n'+rows.join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));a.download='asmo-finance-'+today()+'.csv';document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},500);
+}
+function finWipeAsk(){
+  const n=S.exp.length;if(!n)return;
+  let d=$('dlgFw');if(!d){d=document.createElement('dialog');d.id='dlgFw';document.body.appendChild(d);d.addEventListener('click',e=>{if(e.target===d)d.close()})}
+  const inc=S.exp.filter(isInc).length,ds=S.exp.map(x=>x.date).sort();
+  d.innerHTML=`<form onsubmit="event.preventDefault();finWipe()">
+    <h2>Очистить финансы?</h2>
+    <p style="margin:0 0 10px">Будет удалено записей: <b>${n}</b> (расходов ${n-inc}, доходов ${inc}) за всё время, с ${esc(fmt(ds[0]))} по ${esc(fmt(ds[ds.length-1]))}.</p>
+    <p class="muted small" style="margin:0">Записи пропадут и на других ваших устройствах после синхронизации. Задачи, график и вес не затрагиваются. Сразу после удаления можно нажать «Отменить», а перед этим можно скачать копию.</p>
+    <div class="dFoot" style="flex-wrap:wrap"><button type="button" class="btn" onclick="finCsv()">Скачать копию (CSV)</button><button type="button" class="btn" onclick="$('dlgFw').close()">Отмена</button><button type="submit" class="btn" style="background:var(--pome);border-color:var(--pome);color:#fff">Удалить всё</button></div>
+  </form>`;
+  d.showModal();
+}
+function finWipe(){
+  const all=S.exp.splice(0,S.exp.length);const d=$('dlgFw');if(d&&d.open)d.close();
+  save();render();toast('Удалено записей: '+all.length,()=>{S.exp.push(...all)});
 }
 
 
